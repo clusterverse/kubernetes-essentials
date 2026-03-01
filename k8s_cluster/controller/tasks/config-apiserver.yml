@@ -4,11 +4,11 @@
   include_tasks: sslcerts-apiserver.yml
 
 - name: controller/config/apiserver | create config directory
-  become: yes
+  become: true
   file: path={{k8s_config_dir}}/ state=directory
 
 - name: controller/config/apiserver | Create the kube-apiserver.service systemd unit file
-  become: yes
+  become: true
   copy:
     content: |
       [Unit]
@@ -39,7 +39,7 @@
         --secure-port={{apiserver.secure_port}} \
         --service-account-key-file={{serviceaccount_crt_filepath}} \
         --service-account-signing-key-file={{serviceaccount_key_filepath}} \
-        --service-account-issuer={% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}} \
+        --service-account-issuer={% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}} \
         --service-cluster-ip-range={{k8s_network.service_ip_cidr}} \
         --service-node-port-range=30000-32767 \
         --tls-cert-file={{apiserver_crt_filepath}} \
@@ -51,5 +51,5 @@
       [Install]
       WantedBy=multi-user.target
     dest: "/etc/systemd/system/kube-apiserver.service"
-    force: yes
+    force: true
   notify: ["reload controller systemd", "restart kube-apiserver"]

@@ -1,23 +1,24 @@
 ---
 
 - name: Add Google's apt key
-  become: yes
+  become: true
   apt_key:
     url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
 
 - name: Adding google cloud sdk repository
-  become: yes
+  become: true
   apt_repository:
-    repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture }}] https://packages.cloud.google.com/apt cloud-sdk main"
+    repo: "deb [arch={{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture'] }}] https://packages.cloud.google.com/apt cloud-sdk main"
     state: present
 
 - name: apt install on localhost
-  become: yes
+  become: true
   apt:
-    name: ['build-essential', 'kubectl', 'netcat', 'google-cloud-sdk']
+    name: ['build-essential', 'kubectl', 'ncat', 'google-cloud-sdk']
     update_cache: True
 
 - name: Install PIP packages
-  become: yes
-  pip:
+  become: true
+  ansible.builtin.pip:
     name: ["openshift", "kubernetes-validate"]
+    break_system_packages: true

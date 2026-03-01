@@ -1,4 +1,3 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,35 +7,21 @@ spec:
   replicas: 3
   selector:
     matchLabels:
-      app: pyechoserver
+      app.kubernetes.io/name: pyechoserver
   template:
     metadata:
       labels:
-        app: pyechoserver
+        app.kubernetes.io/name: pyechoserver
     spec:
-{#      affinity:#}
-{#        podAntiAffinity:#}
-{#          preferredDuringSchedulingIgnoredDuringExecution:#}
-{#            - podAffinityTerm:#}
-{#                labelSelector:#}
-{#                  matchExpressions: [ { 'key': 'app', 'operator': 'In', 'values': ['pyechoserver'] } ]#}
-{#                topologyKey: "topology.kubernetes.io/zone"#}
-{#              weight: 100#}
-{#            - podAffinityTerm:#}
-{#                labelSelector:#}
-{#                  matchExpressions: [ { 'key': 'app', 'operator': 'In', 'values': ['pyechoserver'] } ]#}
-{#                topologyKey: "kubernetes.io/hostname"#}
-{#              weight: 100#}
       topologySpreadConstraints:
-        - maxSkew: 1    # ignored as we're setting whenUnsatisfiable: ScheduleAnyway
+        - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
           whenUnsatisfiable: ScheduleAnyway
-          labelSelector: { matchLabels: { app: pyechoserver } }
-        - maxSkew: 1    # ignored as we're setting whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: pyechoserver } }
+        - maxSkew: 2
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway
-          labelSelector: { matchLabels: { app: pyechoserver } }
-
+          labelSelector: { matchLabels: { app.kubernetes.io/name: pyechoserver } }
       containers:
         - name: pyechoserver
           image: dseeley/pyechoserver:latest
@@ -45,35 +30,42 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: pyechoserver
+  name: pyechoserver-svc
   namespace: default
-  labels:
-    app: pyechoserver
 spec:
   selector:
-    app: pyechoserver
+    app.kubernetes.io/name: pyechoserver
   ports:
-  - port: 8090
-    protocol: TCP
+    - port: 8090
+      targetPort: 8090
+      protocol: TCP
+      name: http
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
 metadata:
-  name: pyechoserver
+  name: pyechoserver-gw
   namespace: default
-  annotations:
-    ingress.kubernetes.io/rewrite-target: /
 spec:
-  ingressClassName: haproxy
+  gatewayClassName: haproxy
+  listeners:
+    - name: http-listener
+      port: 80
+      protocol: HTTP
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: pyechoserver-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: pyechoserver-gw
+  hostnames:
+    - "pyechoserver.dev.k8s.chezdj.com"
   rules:
-    - http:
-        paths:
-          - path: /{% if cluster_vars.dns_user_domain is not defined  or  cluster_vars.dns_user_domain == '' %}pyechoserver{% endif %}{{''}}
-            pathType: Prefix
-            backend:
-              service:
-                name: pyechoserver
-                port:
-                  number: 8090
-      {% if cluster_vars.dns_user_domain is defined and cluster_vars.dns_user_domain != "" %}host: "pyechoserver.{{cluster_vars.dns_user_domain}}"{% endif %}
+    - backendRefs:
+        - name: pyechoserver-svc
+          port: 8090

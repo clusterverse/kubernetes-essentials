@@ -1,37 +1,52 @@
 #!/usr/bin/env python
 
 from ansible.utils.display import Display
-from ansible import constants as C
-from ansible.module_utils._text import to_native, to_text
-from ansible.template import AnsibleUndefined
 
 display = Display()
 
 
-# Convert a YAML object containing $ANSIBLE_VAULT to a yaml multiline string beginning "!vault |".  Useful to output vaulted yaml to file without decrypting.
-def to_yaml_vaulted(yamlobj):
-    import yaml
-    from ansible.parsing.yaml.objects import AnsibleUnicode, AnsibleVaultEncryptedUnicode
+# Convert a YAML object (e.g. perhaps converted with dseeley.ansible_vault_pipe.encrypt) containing $ANSIBLE_VAULT to a yaml multiline string beginning "!vault |".  Useful to output vaulted yaml to a file without decrypting.
+def to_yaml_vaulted(ansible_obj):
+    import yaml, json
+    from ansible.template import AnsibleUndefined
     from ansible.utils.unsafe_proxy import AnsibleUnsafeText
+    from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
 
-    vault_tagstr = u'!vault'
+    # def to_py_native(value):
+    #     """Recursively convert Ansible special objects to plain Python types.  Fails when using loading already-vaulted yaml."""
+    #     if isinstance(value, (AnsibleUnsafeText, AnsibleUndefined)):
+    #         return str(value)  # ← strips unsafe/lazy flag
+    #     if isinstance(value, AnsibleVaultEncryptedUnicode):
+    #         # Keep vault content as original string — exactly what we want
+    #         return value._ciphertext.decode('utf-8') if hasattr(value, '_ciphertext') else str(value)
+    #     if isinstance(value, dict):
+    #         return {k: to_py_native(v) for k, v in value.items()}
+    #     if isinstance(value, (list, tuple)):
+    #         return [to_py_native(item) for item in value]
+    #     return value
+    #
+    # clean_obj = to_py_native(ansible_obj)                             # Fails when using loading already-vaulted yaml.
 
+    clean_obj = json.loads(json.dumps(ansible_obj, default=str))      # Works with already-vaulted yaml.  Problem is already-vaulted yaml is unvaulted here.
+
+    # Now we only have safe Python types → no pickling problems
     def str_presenter(dumper, data):
-        if data.startswith('$ANSIBLE_VAULT'):
-            return dumper.represent_scalar(vault_tagstr, data, style='|')
-        else:
-            if len(data.splitlines()) > 1:
-                return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
-            else:
-                return dumper.represent_scalar(u'tag:yaml.org,2002:str', data)
+        if isinstance(data, str) and data.startswith('$ANSIBLE_VAULT'):
+            return dumper.represent_scalar(u'!vault', data, style='|')
+        if isinstance(data, str) and '\n' in data:
+            return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
+        return dumper.represent_scalar(u'tag:yaml.org,2002:str', data)
 
-    yaml.add_representer(AnsibleVaultEncryptedUnicode, lambda dumper, data: dumper.represent_scalar(vault_tagstr, data._ciphertext.decode('utf-8'), style='|'))
-    yaml.add_representer(AnsibleUnsafeText, str_presenter)
-    yaml.add_representer(AnsibleUnicode, str_presenter)
     yaml.add_representer(str, str_presenter)
-    yaml.representer.SafeRepresenter.add_representer(str, str_presenter)    # to use with safe_dump
+    yaml.representer.SafeRepresenter.add_representer(str, str_presenter)
 
-    return (yaml.dump(yamlobj, width=4096, encoding='utf-8')).decode('utf-8')
+    # width=4096 prevents unwanted line wrapping
+    return yaml.dump(clean_obj, width=4096, allow_unicode=True, encoding='utf-8').decode('utf-8')
+
+
+class FilterModule(object):
+    def filters(self):
+        return {'to_yaml_vaulted': to_yaml_vaulted}
 
 
 # Convert a YAML string with the "!vault" tag to a plain (not-decrypted) yaml Object (without the tag).  Useful for loading vaulted string as encrypted yaml.

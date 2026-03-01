@@ -1,4 +1,3 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,34 +7,21 @@ spec:
   replicas: 3
   selector:
     matchLabels:
-      app: tcpecho
+      app.kubernetes.io/name: tcpecho
   template:
     metadata:
       labels:
-        app: tcpecho
+        app.kubernetes.io/name: tcpecho
     spec:
-{#      affinity:#}
-{#        podAntiAffinity:#}
-{#          preferredDuringSchedulingIgnoredDuringExecution:#}
-{#            - podAffinityTerm:#}
-{#                labelSelector:#}
-{#                  matchExpressions: [ { 'key': 'app', 'operator': 'In', 'values': ['tcpecho'] } ]#}
-{#                topologyKey: "topology.kubernetes.io/zone"#}
-{#              weight: 100#}
-{#            - podAffinityTerm:#}
-{#                labelSelector:#}
-{#                  matchExpressions: [ { 'key': 'app', 'operator': 'In', 'values': ['tcpecho'] } ]#}
-{#                topologyKey: "kubernetes.io/hostname"#}
-{#              weight: 100#}
       topologySpreadConstraints:
-        - maxSkew: 1    # ignored as we're setting whenUnsatisfiable: ScheduleAnyway
+        - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
           whenUnsatisfiable: ScheduleAnyway
-          labelSelector: { matchLabels: { app: tcpecho } }
-        - maxSkew: 1    # ignored as we're setting whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: tcpecho } }
+        - maxSkew: 2
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway
-          labelSelector: { matchLabels: { app: tcpecho } }
+          labelSelector: { matchLabels: { app.kubernetes.io/name: tcpecho } }
       containers:
         - name: tcpecho
           image: dseeley/tcpecho:latest
@@ -44,34 +30,40 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: tcpecho
+  name: tcpecho-svc
   namespace: default
-  labels:
-    app: tcpecho
 spec:
   selector:
-    app: tcpecho
+    app.kubernetes.io/name: tcpecho
   ports:
-  - port: 3495
-    protocol: TCP
+    - port: 3495
+      targetPort: 3495
+      protocol: TCP
+      name: tcp
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
 metadata:
-  name: tcpecho
+  name: tcpecho-gw
   namespace: default
-  annotations:
-    ingress.kubernetes.io/tcp-service-port: "3495"
 spec:
-  ingressClassName: haproxy
+  gatewayClassName: haproxy
+  listeners:
+    - name: tcpecho-listener
+      port: 3495               # Must match external access port
+      protocol: TCP
+
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: tcpecho-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: tcpecho-gw
   rules:
-    - http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: tcpecho
-                port:
-                  number: 3495
+    - backendRefs:
+        - name: tcpecho-svc
+          port: 3495

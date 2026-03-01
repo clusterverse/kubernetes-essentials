@@ -1,6 +1,6 @@
 ---
 
-- assert: { that: "apiserver.url is defined and apiserver.url != ''", fail_msg: "Please define apiserver.url" }
+- assert: { that: "apiserver.url is defined and apiserver.url is truthy", fail_msg: "Please define apiserver.url" }
 
 - name: apiserver-lb-awsalb | Create apiserver certificate/ key
   include_tasks: sslcerts-apiserver.yml

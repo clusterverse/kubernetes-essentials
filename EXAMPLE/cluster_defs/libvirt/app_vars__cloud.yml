@@ -7,6 +7,6 @@ apiserver:
 
 edge_ingress:
   controller: "haproxy-ingress"
-  ha_mgr: "kube-keepalived-vip"
+  ha_mgr: ""
   keepalived:
-    vip_cidr: 192.168.1.49/25
+    vip_cidr: ""

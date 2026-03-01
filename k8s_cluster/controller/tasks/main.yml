@@ -1,29 +1,31 @@
 ---
 
 - name: controller | apt install
-  become: yes
+  become: true
   apt:
     name: ['python3-pip']
     update_cache: True
 
 - name: controller | Install PIP modules needed for Ansible k8s
-  become: yes
-  pip:
+  become: true
+  ansible.builtin.pip:
     name: ["openshift", "kubernetes-validate"]
+    break_system_packages: true
+    extra_args: --ignore-installed
 
 - name: controller | Download & install kubectl
-  become: yes
+  become: true
   get_url:
     url: "{{k8s_artifact_location}}/kubectl"
     dest: "/usr/local/bin/kubectl"
     mode: 0755
 
 - name: controller | create bin directory
-  become: yes
+  become: true
   file: path={{k8s_bin_dir}} state=directory
 
 - name: controller | Download & install binaries
-  become: yes
+  become: true
   get_url:
     url: "{{k8s_artifact_location}}/{{ item }}"
     dest: "{{k8s_bin_dir}}/{{ item }}"
@@ -34,11 +36,11 @@
     - kube-scheduler
 
 - name: controller | create config directory
-  become: yes
+  become: true
   file: path={{k8s_config_dir}}/ state=directory
 
 #- name: controller | Create EncryptionConfig
-#  become: yes
+#  become: true
 #  copy:
 #    content: |-
 #      kind: EncryptionConfig
@@ -82,7 +84,7 @@
     url: "https://{{ansible_host}}:{{apiserver.secure_port}}/livez"
     method: GET
     status_code: 200
-    validate_certs: no
+    validate_certs: false
   register: r__uri__clusterlivez
   until: "r__uri__clusterlivez.status == 200"
   retries: 60     #5 minutes
@@ -105,10 +107,10 @@
 
     - name: controller | Wait for apiserver to be running loadbalanced
       uri:
-        url: "{% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}/livez"
+        url: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}/livez"
         method: GET
         status_code: 200
-        validate_certs: no
+        validate_certs: false
       register: r__uri__clusterlivez
       until: "r__uri__clusterlivez.status == 200"
       retries: 60     #5 minutes
@@ -120,11 +122,11 @@
 
 
 - name: controller | apply kubelet_rbac
-  become: yes
+  become: true
   shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
 #  k8s:
 #    kubeconfig: "{{k8s_home_kube_dir}}/config"
 #    resource_definition: "{{ item | from_yaml }}"
-#    validate: { fail_on_error: yes }
+#    validate: { fail_on_error: true }
   loop: "{{ lookup('template', 'files/kubelet_rbac.yml').split('---') | select() }}"
   run_once: true

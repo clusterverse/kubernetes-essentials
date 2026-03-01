@@ -4,11 +4,11 @@
   include_tasks: sslcerts-kubelet.yml
 
 - name: node/config/kubelet | create bin directory
-  become: yes
+  become: true
   file: path={{k8s_bin_dir}} state=directory
 
 - name: node/config/kubelet | Download & install
-  become: yes
+  become: true
   get_url:
     url: "{{k8s_artifact_location}}/kubelet"
     dest: "{{k8s_bin_dir}}/kubelet"
@@ -18,38 +18,38 @@
 - name: node/config/kubelet
   block:
     - name: node/config/kubelet | create config directory
-      become: yes
+      become: true
       file: path={{k8s_config_dir}}/kubelet state=directory
 
     - name: node/config/kubelet | write out kubeconfig
-      become: yes
+      become: true
       copy:
         content: |
           apiVersion: v1
           clusters:
           - cluster:
               certificate-authority-data: {{ ssl_ca['ca-crt.pem'] | b64encode }}
-              server: "{% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
+              server: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
             name: {{cluster_name}}
           contexts:
           - context:
               cluster: {{cluster_name}}
-              user: system:node:{{ansible_hostname}}
+              user: system:node:{{ansible_facts['hostname']}}
             name: default
           current-context: default
           kind: Config
           preferences: {}
           users:
-          - name: system:node:{{ansible_hostname}}
+          - name: system:node:{{ansible_facts['hostname']}}
             user:
-              client-certificate-data: {{ k8s_certs[crt_varname] | b64encode }}
-              client-key-data: {{ k8s_certs[key_varname] | b64encode }}
+              client-certificate: {{k8s_cert_dir}}/{{crt_varname}}
+              client-key: {{k8s_cert_dir}}/{{key_varname}}
         dest: "{{ k8s_config_dir }}/kubelet/kubeconfig"
-        force: yes
+        force: true
       notify: ["restart kubelet"]
 
     - name: node/config/kubelet | Create the kubelet-config.yaml configuration file
-      become: yes
+      become: true
       copy:
         content: |
           kind: KubeletConfiguration
@@ -73,11 +73,11 @@
           tlsPrivateKeyFile: "{{k8s_cert_dir}}/{{key_varname}}"
           registerNode: true
         dest: "{{ k8s_config_dir }}/kubelet/kubelet-config.yaml"
-        force: yes
+        force: true
       notify: ["restart kubelet"]
 
     - name: node/config/kubelet | Create the kubelet.service systemd unit file
-      become: yes
+      become: true
       copy:
         content: |
           [Unit]
@@ -99,8 +99,8 @@
           [Install]
           WantedBy=multi-user.target
         dest: "/etc/systemd/system/kubelet.service"
-        force: yes
+        force: true
       notify: ["reload node systemd", "restart kubelet"]
   vars:
-    crt_varname: "kubelet-crt-{{ansible_hostname}}.pem"
-    key_varname: "kubelet-key-{{ansible_hostname}}.pem"
+    crt_varname: "kubelet-crt-{{ansible_facts['hostname']}}.pem"
+    key_varname: "kubelet-key-{{ansible_facts['hostname']}}.pem"

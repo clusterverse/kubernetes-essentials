@@ -4,18 +4,18 @@
   include_tasks: sslcerts-controller-manager.yml
 
 - name: controller/config/controller-manager | create config directory
-  become: yes
+  become: true
   file: path={{k8s_config_dir}} state=directory
 
 - name: controller/config/controller-manager | write out kubeconfig
-  become: yes
+  become: true
   copy:
     content: |
       apiVersion: v1
       clusters:
       - cluster:
           certificate-authority-data: {{ ssl_ca['ca-crt.pem'] | b64encode }}
-          server: "{% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
+          server: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
         name: {{cluster_name}}
       contexts:
       - context:
@@ -31,11 +31,11 @@
           client-certificate-data: {{ k8s_certs['controller-manager-crt.pem'] | b64encode }}
           client-key-data: {{  k8s_certs['controller-manager-key.pem'] | b64encode }}
     dest: "{{ k8s_config_dir }}/kube-controller-manager.kubeconfig"
-    force: yes
+    force: true
   notify: ["restart kube-controller-manager"]
 
 - name: controller/config/controller-manager | Create the kube-controller-manager.service systemd unit file
-  become: yes
+  become: true
   copy:
     content: |
       [Unit]
@@ -64,5 +64,5 @@
       [Install]
       WantedBy=multi-user.target
     dest: "/etc/systemd/system/kube-controller-manager.service"
-    force: yes
+    force: true
   notify: ["reload controller systemd", "restart kube-controller-manager"]

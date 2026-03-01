@@ -3,11 +3,11 @@
 - name: node/hostconfig
   block:
     - name: node/hostconfig | Disable swap for current session
-      become: yes
+      become: true
       command: swapoff -a
 
     - name: node/hostconfig | Remove swapfile from /etc/fstab
-      become: yes
+      become: true
       mount:
         name: "{{ item }}"
         fstype: swap
@@ -15,7 +15,7 @@
       with_items: ["swap", "none"]
 
     - name: node/hostconfig | apt install
-      become: yes
+      become: true
       apt:
         name: ['unzip']  	# 'unzip'  needed for ansible.builtin.unarchive
         update_cache: True
@@ -23,17 +23,17 @@
 
 - name: node | Run cloud-specific VIP config (if defined)
   include_tasks: "{{item}}"
-  with_first_found: [{ files: ["vips_{{cluster_vars.type}}.yml"], skip: true }]
+  with_first_found: [{ files: ["vips_{{cluster_vars.cloud_type}}.yml"], skip: true }]
 
 - name: node | install node-dependent packages
-  become: yes
+  become: true
   apt:
-    update_cache: yes
+    update_cache: true
     name: ['conntrack', 'ipset']
     state: present
 
 - name: node | load the nf_conntrack module
-  become: yes
+  become: true
   modprobe:
     name: nf_conntrack
     state: present
@@ -50,64 +50,67 @@
 - name: node | flush handlers
   meta: flush_handlers
 
+- name: node | debug ansible_play_batch
+  debug: msg="{{ansible_play_batch}}"
+
 - name: node | Wait for nodes to be created (NOT necessarily 'Ready')
-  become: yes
+  become: true
   delegate_to: "{{groups['controller'][0]}}"
   uri:
-    url: "{% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}/api/v1/nodes/"
+    url: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}/api/v1/nodes/"
     method: GET
     status_code: 200
-    validate_certs: no
+    validate_certs: false
     ca_path: "{{k8s_home_kube_dir}}/{{cluster_name}}/ca-crt.pem"
     client_cert: "{{k8s_home_kube_dir}}/{{cluster_name}}/admin-crt.pem"
     client_key: "{{k8s_home_kube_dir}}/{{cluster_name}}/admin-key.pem"
-    return_content: yes
-  run_once: yes
+    return_content: true
+  run_once: true
   register: r__clusternodes_result
   until: >
     r__clusternodes_result.status == 200  and
     'json' in r__clusternodes_result  and
-    (not r__clusternodes_result.json['items'] | json_query("[].metadata.name") | symmetric_difference(play_hosts))
-  retries: 60     #5 minutes
+    (r__clusternodes_result.json['items'] | json_query("[].metadata.name") | symmetric_difference(ansible_play_batch) | length == 0)
+  retries: 10     # retries: 60 = 5 minutes
   delay: 5
 
 - name: node | nodes status
   debug:
     msg: "{{r__clusternodes_result}}"
-  run_once: yes
+  run_once: true
 
 - name: node/worker | label all nodes with 'node' role
-  become: yes
+  become: true
   delegate_to: "{{groups['controller'][0]}}"
-  shell: "kubectl patch node {{ansible_hostname}} --patch '{{resource_definition| to_json}}'"
+  shell: "kubectl patch node {{ansible_facts['hostname']}} --patch '{{resource_definition| to_json}}'"
 #  k8s:
 #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    validate: { fail_on_error: yes }
+#    validate: { fail_on_error: true }
 #    resource_definition: "{{resource_definition}}"
   vars:
     resource_definition:
       apiVersion: v1
       kind: Node
       metadata:
-        name: "{{ansible_hostname}}"
+        name: "{{ansible_facts['hostname']}}"
         labels:
           node-role.kubernetes.io/node: 'true'
-          topology.kubernetes.io/zone: "{{hostvars[ansible_hostname].regionzone}}"
+          topology.kubernetes.io/zone: "{{hostvars[ansible_facts['hostname']].regionzone}}"
 
 - name: node/edge | label and taint node-edge nodes with 'edge_ingress.node_role_name' role
-  become: yes
+  become: true
   delegate_to: "{{groups['controller'][0]}}"
   shell: "cat <<EOF | kubectl apply -f -\n{{resource_definition | to_yaml}}\nEOF"
 #  k8s:
 #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    validate: { fail_on_error: yes }
+#    validate: { fail_on_error: true }
 #    resource_definition: "{{resource_definition}}"
   vars:
     resource_definition:
       apiVersion: v1
       kind: Node
       metadata:
-        name: "{{ansible_hostname}}"
+        name: "{{ansible_facts['hostname']}}"
         labels: "{{ { 'node-role.kubernetes.io/' + edge_ingress.node_role_name: 'true' } }}"
       spec:
         taints:

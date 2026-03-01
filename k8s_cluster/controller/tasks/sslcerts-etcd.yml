@@ -20,4 +20,4 @@
         - { key: 'etcd-key.pem', val: "{{k8s_certs['etcd-key.pem']}}", mode: '0600'}
         - { key: 'ca-crt.pem', val: "{{ssl_ca['ca-crt.pem']}}", mode: '0644'}
       notify: ["restart kube-apiserver"]
-  become: yes
+  become: true

@@ -1,31 +1,31 @@
 ---
 
 - name: addon/flannel | apply config
-  become: yes
+  become: true
   shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
 #  k8s:
 #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    apply: yes
+#    apply: true
 #    resource_definition: "{{ item | from_yaml }}"
-#    validate: { fail_on_error: yes }
+#    validate: { fail_on_error: true }
   loop: "{{ lookup('template', 'templates/kube-flannel.yml.j2').split('---') | select() }}"
   when: flannel_version is defined  and  flannel_version != ""
-  run_once: yes
+  run_once: true
 
 - name: addon | Wait for nodes to be *Ready*
   block:
     - name: addon | Wait for nodes to be *Ready*
-      become: yes
+      become: true
       uri:
-        url: "{% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}/api/v1/nodes/"
+        url: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}/api/v1/nodes/"
         method: GET
         status_code: 200
-        validate_certs: no
+        validate_certs: false
         ca_path: "{{k8s_home_kube_dir}}/{{cluster_name}}/ca-crt.pem"
         client_cert: "{{k8s_home_kube_dir}}/{{cluster_name}}/admin-crt.pem"
         client_key: "{{k8s_home_kube_dir}}/{{cluster_name}}/admin-key.pem"
-        return_content: yes
-      run_once: yes
+        return_content: true
+      run_once: true
       register: r__clusternodes_result
       until: >
         r__clusternodes_result.status == 200  and
@@ -38,78 +38,73 @@
     - name: addon | nodes status
       debug:
         msg: "{{r__clusternodes_result}}"
-      run_once: yes
+      run_once: true
 
-#- name: addon/gcp_lb | Install application loadbalancer
-#  include_tasks: gce-lb-apps.yml
-#  when: edge_ingress.controller == "gcp_external"
+- name: addon/haproxy-ingress | add Gateway API
+  become: true
+  block:
+    - name: addon/haproxy-ingress | add Gateway API CRD
+      delegate_to: "{{groups['controller'][0]}}"
+      shell: "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/experimental-install.yaml"
+      register: r__gateway_api_install
 
-- name: addon/haproxy-ingress | apply config
-  become: yes
-  delegate_to: "{{groups['controller'][0]}}"
-  shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-  #  k8s:
-  #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-  #    apply: yes
-  #    validate: { fail_on_error: yes }
-  #    resource_definition: "{{ item | from_yaml }}"
-  loop: "{{ lookup('template', 'templates/haproxy-ingress.yml.j2').split('---') | select() }}"
+    - name: addon/haproxy-ingress | debug gateway_api_install
+      debug: var=r__gateway_api_install
+
+    - name: addon/haproxy-ingress | add GatewayClass
+      kubernetes.core.k8s:
+        apply: true
+        resource_definition:
+          apiVersion: gateway.networking.k8s.io/v1
+          kind: GatewayClass
+          metadata:
+            name: haproxy
+          spec:
+            controllerName: haproxy-ingress.github.io/controller
+        validate:
+          fail_on_error: yes
+
+      # NOTE: to generate haproxy-ingress.yml:
+      # $ helm repo add haproxy-ingress https://haproxy-ingress.github.io/charts
+      # $ helm template haproxy-ingress --namespace=kube-system --set controller.minAvailable=0 --set controller.maxUnavailable=-1 --set controller.replicaCount=0 --set controller.kind=DaemonSet --set controller.service.enabled=false --set controller.hostNetwork=true --set controller.ingressClass=haproxy --set controller.ingressClassResource.enabled=true --set-json controller.ingressClassResource.parameters='{"kind": "ConfigMap", "name": "haproxy-ingress"}' --set-json controller.config='{"balance-algorithm": "roundrobin", "maxconn-server": "500", "ssl-redirect": "false"}' --set-json 'controller.tolerations=[{"key":"node-role.kubernetes.io/{{edge_ingress.node_role_name}}","operator":"Equal","value":"true"}]' --set-json controller.nodeSelector='{"node-role.kubernetes.io/{{edge_ingress.node_role_name}}": "true"}' --set defaultBackend.enabled=true --set defaultBackend.minAvailable=0 --set defaultBackend.replicaCount=3  haproxy-ingress/haproxy-ingress > haproxy-ingress.yml.j2
+    - name: addon/haproxy-ingress | apply config
+      delegate_to: "{{groups['controller'][0]}}"
+      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
+      loop: "{{ lookup('template', 'templates/haproxy-ingress.yml.j2').split('---') | select() }}"
   run_once: true
   when: edge_ingress.controller == "haproxy-ingress"
 
-- name: addon/keepalived-vip | apply config
-  become: yes
-  delegate_to: "{{groups['controller'][0]}}"
-  shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-  #  k8s:
-  #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-  #    apply: yes
-  #    validate: { fail_on_error: yes }
-  #    resource_definition: "{{ item | from_yaml }}"
-  loop: "{{ lookup('template', 'templates/kube-keepalived-vip.yaml.j2').split('---') | select() }}"
-  run_once: true
-  when: edge_ingress.ha_mgr == "kube-keepalived-vip"  and  edge_ingress.keepalived.vip_cidr is defined and edge_ingress.keepalived.vip_cidr != ""
 
 
 - name: addon/coredns
   block:
     - name: addon/coredns | apply config
-      become: yes
+      become: true
       shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-#      k8s:
-#        kubeconfig: "{{k8s_home_kube_dir}}/config"
-#        apply: yes
-#        resource_definition: "{{ item | from_yaml }}"
-#        validate: { fail_on_error: yes }
       loop: "{{ lookup('template', 'templates/coredns.yml.j2').split('---') | select() }}"
-      run_once: yes
+      run_once: true
 
 #    - name: addon/coredns | apply k8s_gateway config   ##Can't get this to work.  Instead, just define a wildcard DNS entry pointing to the external Lb
-#      become: yes
+#      become: true
 #      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-##      k8s:
-##        kubeconfig: "{{k8s_home_kube_dir}}/config"
-##        apply: yes
-##        resource_definition: "{{ item | from_yaml }}"
-##        validate: { fail_on_error: yes }
 #      loop: "{{ lookup('template', 'templates/coredns__k8s_gateway.yml.j2').split('---') | select() }}"
-#      run_once: yes
-#      when: cluster_vars.dns_user_domain is defined  and  cluster_vars.dns_user_domain != ""
+#      run_once: true
+#      when: cluster_vars.dns_domain is defined  and  cluster_vars.dns_domain != ""
 
     - block:
         - name: addon/coredns | get existing pods
-          become: yes
+          become: true
           delegate_to: "{{groups['controller'][0]}}"
           k8s_info:
             kubeconfig: "{{k8s_home_kube_dir}}/config"
             kind: Pod
             namespace: "kube-system"
             label_selectors: ["k8s-app = kube-dns"]
-          run_once: yes
+          run_once: true
           register: r__k8s_info_coredns
 
         - name: addon/coredns | delete pods if we're recreating the certs
-          become: yes
+          become: true
           delegate_to: "{{groups['controller'][0]}}"
           k8s:
             kubeconfig: "{{k8s_home_kube_dir}}/config"
@@ -117,18 +112,13 @@
             namespace: "{{ item.metadata.namespace }}"
             name: "{{ item.metadata.name }}"
             state: absent
-          run_once: yes
+          run_once: true
           with_items: "{{r__k8s_info_coredns.resources}}"
       when: (recreate_certs is defined and recreate_certs|bool)
 
 
 - name: addon/descheduler | apply config
-  become: yes
+  become: true
   shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-  #  k8s:
-  #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-  #    apply: yes
-  #    resource_definition: "{{ item | from_yaml }}"
-  #    validate: { fail_on_error: yes }
   loop: "{{ lookup('template', 'templates/descheduler.yml.j2').split('---') | select() }}"
-  run_once: yes
+  run_once: true

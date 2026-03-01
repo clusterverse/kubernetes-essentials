@@ -5,7 +5,7 @@ cluster_vars:
     ssh_connection_cfg:
       host: &host_ssh_connection_cfg
         ansible_user: "ansible"
-        ansible_ssh_private_key_file: !vault |
+        ansible_ssh_private_key_contents: !vault |
           $ANSIBLE_VAULT;1.1;AES256
           7669080460651349243347331538721104778691266429457726036813912140404310
 #      bastion:

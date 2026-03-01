@@ -8,16 +8,16 @@ global_defs {
 
 vrrp_instance VI_1 {
   state BACKUP
-  interface {{ ansible_default_ipv4.interface }}
+  interface {{ ansible_facts.default_ipv4.interface }}
   virtual_router_id 55
   priority 100
   advert_int 1
 
   track_interface {
-    {{ ansible_default_ipv4.interface }}
+    {{ ansible_facts.default_ipv4.interface }}
   }
 
-  unicast_src_ip {{ ansible_default_ipv4.address }}
+  unicast_src_ip {{ ansible_facts.default_ipv4.address }}
   unicast_peer {
     {% for peer in apiserver_keepalived_peers | sort() -%}
     {{ peer }}

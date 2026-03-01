@@ -1,99 +1,99 @@
 ---
 
 #- name: testapps | Get homedir (useful for the k8s module, which doesn't like the ${HOME} expansion)
-#  become: yes
+#  become: true
 #  command: echo ~
 #  register: homedir
 
-  # Note: To get dashboard temporary login token: kubectl -n kubernetes-dashboard get secret $(kubectl -n kubernetes-dashboard get sa/admin-user -o jsonpath="{.secrets[0].name}") -o go-template="{{.data.token | base64decode}}"
-  # Note: To get dashboard long-lived login token: kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath={".data.token"} | base64 -d "
-- block:
-    - name: test/dashboard | apply base config
-      become: yes
-      delegate_to: "{{groups['controller'][0]}}"
-      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-#      k8s:
-#        kubeconfig: "{{k8s_home_kube_dir}}/config"
-#        apply: yes
-#        resource_definition: "{{ item | from_yaml }}"
-#        validate: { fail_on_error: yes }
-      loop: "{{ lookup('template', 'dashboard.yml.j2').split('---') | select() }}"
-      run_once: yes
-
-    - name: test/dashboard | apply ingress config
-      become: yes
-      delegate_to: "{{groups['controller'][0]}}"
-      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-#      k8s:
-#        kubeconfig: "{{k8s_home_kube_dir}}/config"
-#        apply: yes
-#        validate: { fail_on_error: yes }
-#        resource_definition: "{{ item | from_yaml }}"
-      loop: "{{ lookup('template', 'dashboard-ingress.yml.j2').split('---') | select() }}"
-      run_once: yes
-
-    - block:
-        - name: test/dashboard | get existing pods
-          become: yes
-          delegate_to: "{{groups['controller'][0]}}"
-          k8s_info:
-            kubeconfig: "{{k8s_home_kube_dir}}/config"
-            kind: Pod
-            namespace: "kubernetes-dashboard"
-            label_selectors: ["k8s-app = kubernetes-dashboard"]
-          run_once: yes
-          register: r__k8s_info_dashboard
-
-        - name: test/dashboard | delete pods if we're recreating the certs
-          become: yes
-          delegate_to: "{{groups['controller'][0]}}"
-          k8s:
-            kubeconfig: "{{k8s_home_kube_dir}}/config"
-            kind: Pod
-            namespace: "{{ item.metadata.namespace }}"
-            name: "{{ item.metadata.name }}"
-            state: absent
-          run_once: yes
-          with_items: "{{r__k8s_info_dashboard.resources}}"
-      when: (recreate_certs is defined and recreate_certs|bool)
+#  # Note: To get dashboard temporary login token: kubectl -n kubernetes-dashboard get secret $(kubectl -n kubernetes-dashboard get sa/admin-user -o jsonpath="{.secrets[0].name}") -o go-template="{{.data.token | base64decode}}"
+#  # Note: To get dashboard long-lived login token: kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath={".data.token"} | base64 -d "
+#- block:
+#    - name: test/dashboard | apply base config
+#      become: true
+#      delegate_to: "{{groups['controller'][0]}}"
+#      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
+##      k8s:
+##        kubeconfig: "{{k8s_home_kube_dir}}/config"
+##        apply: true
+##        resource_definition: "{{ item | from_yaml }}"
+##        validate: { fail_on_error: true }
+#      loop: "{{ lookup('template', 'dashboard.yml.j2').split('---') | select() }}"
+#      run_once: true
+#
+#    - name: test/dashboard | apply ingress config
+#      become: true
+#      delegate_to: "{{groups['controller'][0]}}"
+#      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
+##      k8s:
+##        kubeconfig: "{{k8s_home_kube_dir}}/config"
+##        apply: true
+##        validate: { fail_on_error: true }
+##        resource_definition: "{{ item | from_yaml }}"
+#      loop: "{{ lookup('template', 'dashboard-ingress.yml.j2').split('---') | select() }}"
+#      run_once: true
+#
+#    - block:
+#        - name: test/dashboard | get existing pods
+#          become: true
+#          delegate_to: "{{groups['controller'][0]}}"
+#          k8s_info:
+#            kubeconfig: "{{k8s_home_kube_dir}}/config"
+#            kind: Pod
+#            namespace: "kubernetes-dashboard"
+#            label_selectors: ["k8s-app = kubernetes-dashboard"]
+#          run_once: true
+#          register: r__k8s_info_dashboard
+#
+#        - name: test/dashboard | delete pods if we're recreating the certs
+#          become: true
+#          delegate_to: "{{groups['controller'][0]}}"
+#          k8s:
+#            kubeconfig: "{{k8s_home_kube_dir}}/config"
+#            kind: Pod
+#            namespace: "{{ item.metadata.namespace }}"
+#            name: "{{ item.metadata.name }}"
+#            state: absent
+#          run_once: true
+#          with_items: "{{r__k8s_info_dashboard.resources}}"
+#      when: (recreate_certs is defined and recreate_certs|bool)
 
 
 - name: test/nginx-deployment | apply config
-  become: yes
+  become: true
   delegate_to: "{{groups['controller'][0]}}"
   shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
 #  k8s:
 #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    apply: yes
-#    validate: { fail_on_error: yes }
+#    apply: true
+#    validate: { fail_on_error: true }
 #    resource_definition: "{{ item | from_yaml }}"
-  run_once: yes
+  run_once: true
   loop: "{{ lookup('template', 'nginx-deployment.yml.j2').split('---') | select() }}"
   vars:
     custom_html: "{{inventory_hostname}}"
 
 
 - name: test/pyechoserver-deployment | apply config
-  become: yes
+  become: true
   delegate_to: "{{groups['controller'][0]}}"
   shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
 #  k8s:
 #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    apply: yes
-#    validate: { fail_on_error: yes }
+#    apply: true
+#    validate: { fail_on_error: true }
 #    resource_definition: "{{ item | from_yaml }}"
-  run_once: yes
+  run_once: true
   loop: "{{ lookup('template', 'pyechoserver-deployment.yml.j2').split('---') | select() }}"
 
 
 - name: test/tcpecho-deployment | apply config
-  become: yes
+  become: true
   delegate_to: "{{groups['controller'][0]}}"
   shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
 #  k8s:
 #    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    apply: yes
-#    validate: { fail_on_error: yes }
+#    apply: true
+#    validate: { fail_on_error: true }
 #    resource_definition: "{{ item | from_yaml }}"
-  run_once: yes
+  run_once: true
   loop: "{{ lookup('template', 'tcpecho-deployment.yml.j2').split('---') | select() }}"
