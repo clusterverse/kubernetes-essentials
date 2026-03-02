@@ -51,6 +51,3 @@
   run_once: true
   delegate_to: localhost
   when: ssl_ca is not defined
-
-- name: "ssl_ownca | Reload {{ playbook_ca_yaml }} - for all hosts"
-  include_vars: "{{ playbook_ca_yaml }}"

@@ -2,20 +2,18 @@
 
 - name: addon/flannel | apply config
   become: true
-  shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-#  k8s:
-#    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    apply: true
-#    resource_definition: "{{ item | from_yaml }}"
-#    validate: { fail_on_error: true }
-  loop: "{{ lookup('template', 'templates/kube-flannel.yml.j2').split('---') | select() }}"
-  when: flannel_version is defined  and  flannel_version != ""
   run_once: true
+  kubernetes.core.k8s:
+    apply: true
+    server_side_apply: {field_manager: ansible-playbook}
+    template: templates/kube-flannel.yml.j2
+  when: flannel_version is defined  and  flannel_version != ""
 
 - name: addon | Wait for nodes to be *Ready*
+  become: true
+  run_once: true
   block:
     - name: addon | Wait for nodes to be *Ready*
-      become: true
       uri:
         url: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}/api/v1/nodes/"
         method: GET
@@ -25,7 +23,6 @@
         client_cert: "{{k8s_home_kube_dir}}/{{cluster_name}}/admin-crt.pem"
         client_key: "{{k8s_home_kube_dir}}/{{cluster_name}}/admin-key.pem"
         return_content: true
-      run_once: true
       register: r__clusternodes_result
       until: >
         r__clusternodes_result.status == 200  and
@@ -36,24 +33,41 @@
       delay: 5
 
     - name: addon | nodes status
-      debug:
-        msg: "{{r__clusternodes_result}}"
-      run_once: true
+      debug: msg={{r__clusternodes_result}}
 
 - name: addon/haproxy-ingress | add Gateway API
   become: true
+  run_once: true
   block:
-    - name: addon/haproxy-ingress | add Gateway API CRD
-      delegate_to: "{{groups['controller'][0]}}"
-      shell: "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.0.0/experimental-install.yaml"
-      register: r__gateway_api_install
+    - name: addon/haproxy-ingress | install Gateway API CRDs
+      kubernetes.core.k8s:
+        apply: true
+        server_side_apply: {field_manager: ansible-playbook}
+        src: "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/experimental-install.yaml"
+      register: r__k8s__gateway_api_crd_install
 
-    - name: addon/haproxy-ingress | debug gateway_api_install
-      debug: var=r__gateway_api_install
+    - name: addon/haproxy-ingress | debug r__k8s__gateway_api_crd_install
+      debug: var=r__k8s__gateway_api_crd_install
+
+    - name: addon/haproxy-ingress | wait for GatewayClass CRD
+      kubernetes.core.k8s_info:
+        api_version: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        name: gatewayclasses.gateway.networking.k8s.io
+      register: r__k8s__gateway_api_crd_status
+      until: >
+        r__k8s__gateway_api_crd_status.resources | length > 0 and
+        (r__k8s__gateway_api_crd_status | json_query("resources[].status.conditions[?contains(type, 'Established') && contains(status, 'True')]") | flatten | length > 0)
+      retries: 10
+      delay: 5
+
+    - name: addon/haproxy-ingress | debug r__k8s__gateway_api_crd_status
+      debug: var=r__k8s__gateway_api_crd_status
 
     - name: addon/haproxy-ingress | add GatewayClass
       kubernetes.core.k8s:
         apply: true
+        server_side_apply: {field_manager: ansible-playbook}
         resource_definition:
           apiVersion: gateway.networking.k8s.io/v1
           kind: GatewayClass
@@ -65,60 +79,58 @@
           fail_on_error: yes
 
       # NOTE: to generate haproxy-ingress.yml:
-      # $ helm repo add haproxy-ingress https://haproxy-ingress.github.io/charts
-      # $ helm template haproxy-ingress --namespace=kube-system --set controller.minAvailable=0 --set controller.maxUnavailable=-1 --set controller.replicaCount=0 --set controller.kind=DaemonSet --set controller.service.enabled=false --set controller.hostNetwork=true --set controller.ingressClass=haproxy --set controller.ingressClassResource.enabled=true --set-json controller.ingressClassResource.parameters='{"kind": "ConfigMap", "name": "haproxy-ingress"}' --set-json controller.config='{"balance-algorithm": "roundrobin", "maxconn-server": "500", "ssl-redirect": "false"}' --set-json 'controller.tolerations=[{"key":"node-role.kubernetes.io/{{edge_ingress.node_role_name}}","operator":"Equal","value":"true"}]' --set-json controller.nodeSelector='{"node-role.kubernetes.io/{{edge_ingress.node_role_name}}": "true"}' --set defaultBackend.enabled=true --set defaultBackend.minAvailable=0 --set defaultBackend.replicaCount=3  haproxy-ingress/haproxy-ingress > haproxy-ingress.yml.j2
-    - name: addon/haproxy-ingress | apply config
-      delegate_to: "{{groups['controller'][0]}}"
-      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-      loop: "{{ lookup('template', 'templates/haproxy-ingress.yml.j2').split('---') | select() }}"
-  run_once: true
+      # https://github.com/haproxy-ingress/charts
+      # helm repo add haproxy-ingress https://haproxy-ingress.github.io/charts
+      # helm template haproxy-ingress --namespace=kube-system --set controller.minAvailable=0 --set controller.maxUnavailable=-1 --set controller.replicaCount=0 --set controller.kind=DaemonSet --set controller.service.enabled=false --set controller.hostNetwork=true --set controller.ingressClass=haproxy --set controller.ingressClassResource.enabled=true --set-json controller.ingressClassResource.parameters='{"kind": "ConfigMap", "name": "haproxy-ingress"}' --set-json controller.config='{"balance-algorithm": "roundrobin", "maxconn-server": "500", "ssl-redirect": "false"}' --set-json 'controller.tolerations=[{"key":"node-role.kubernetes.io/{{edge_ingress.node_role_name}}","operator":"Equal","value":"true"}]' --set-json controller.nodeSelector='{"node-role.kubernetes.io/{{edge_ingress.node_role_name}}": "true"}' --set defaultBackend.enabled=true --set defaultBackend.minAvailable=0 --set defaultBackend.replicaCount=3  haproxy-ingress/haproxy-ingress > haproxy-ingress.yml.j2
+    - name: addon/haproxy-ingress | apply haproxy-ingress config from template
+      kubernetes.core.k8s:
+        apply: true
+        server_side_apply: {field_manager: ansible-playbook}
+        template: templates/haproxy-ingress.yml.j2
   when: edge_ingress.controller == "haproxy-ingress"
 
 
-
 - name: addon/coredns
+  become: true
+  run_once: true
   block:
     - name: addon/coredns | apply config
-      become: true
-      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-      loop: "{{ lookup('template', 'templates/coredns.yml.j2').split('---') | select() }}"
-      run_once: true
+      kubernetes.core.k8s:
+        apply: true
+        server_side_apply: {field_manager: ansible-playbook}
+        template: templates/coredns.yml.j2
 
-#    - name: addon/coredns | apply k8s_gateway config   ##Can't get this to work.  Instead, just define a wildcard DNS entry pointing to the external Lb
-#      become: true
-#      shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-#      loop: "{{ lookup('template', 'templates/coredns__k8s_gateway.yml.j2').split('---') | select() }}"
-#      run_once: true
+#    - name: addon/coredns | apply k8s_gateway config   ##Can't get this to work.  Instead, just define a multiple DNS entries pointing to the 'node-edge' IPs
+#      kubernetes.core.k8s:
+#        apply: true
+#        server_side_apply: {field_manager: ansible-playbook}
+#        template: templates/coredns__k8s_gateway.yml.j2
 #      when: cluster_vars.dns_domain is defined  and  cluster_vars.dns_domain != ""
 
     - block:
         - name: addon/coredns | get existing pods
-          become: true
-          delegate_to: "{{groups['controller'][0]}}"
-          k8s_info:
+          kubernetes.core.k8s_info:
             kubeconfig: "{{k8s_home_kube_dir}}/config"
             kind: Pod
             namespace: "kube-system"
             label_selectors: ["k8s-app = kube-dns"]
-          run_once: true
           register: r__k8s_info_coredns
 
         - name: addon/coredns | delete pods if we're recreating the certs
-          become: true
-          delegate_to: "{{groups['controller'][0]}}"
-          k8s:
+          kubernetes.core.k8s:
             kubeconfig: "{{k8s_home_kube_dir}}/config"
             kind: Pod
             namespace: "{{ item.metadata.namespace }}"
             name: "{{ item.metadata.name }}"
             state: absent
-          run_once: true
           with_items: "{{r__k8s_info_coredns.resources}}"
       when: (recreate_certs is defined and recreate_certs|bool)
 
 
 - name: addon/descheduler | apply config
   become: true
-  shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-  loop: "{{ lookup('template', 'templates/descheduler.yml.j2').split('---') | select() }}"
   run_once: true
+  kubernetes.core.k8s:
+    apply: true
+    server_side_apply: {field_manager: ansible-playbook}
+    template: templates/descheduler.yml.j2
