@@ -58,7 +58,7 @@
 #    force: "{{'yes' if force_new_encryption_config is defined and force_new_encryption_config|bool else 'no'}}"
 #  notify: ["restart kube-apiserver"]
 
-- name: controller | generate and copy etcd certificates
+- name: controller | generate (if necessary) and copy etcd certificates
   include_tasks: sslcerts-etcd.yml
 
 - name: controller | Create serviceaccount certificate/ key
@@ -123,10 +123,8 @@
 
 - name: controller | apply kubelet_rbac
   become: true
-  shell: "cat <<EOF | kubectl apply -f -\n{{item}}\nEOF"
-#  k8s:
-#    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    resource_definition: "{{ item | from_yaml }}"
-#    validate: { fail_on_error: true }
-  loop: "{{ lookup('template', 'files/kubelet_rbac.yml').split('---') | select() }}"
   run_once: true
+  kubernetes.core.k8s:
+    apply: true
+    server_side_apply: {field_manager: ansible-playbook}
+    template: files/kubelet_rbac.yml              # Use 'template', rather than 'src', because 'src' is on the remote, 'template' is on the controller.

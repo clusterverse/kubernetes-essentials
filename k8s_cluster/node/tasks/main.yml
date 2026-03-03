@@ -82,12 +82,10 @@
 - name: node/worker | label all nodes with 'node' role
   become: true
   delegate_to: "{{groups['controller'][0]}}"
-  shell: "kubectl patch node {{ansible_facts['hostname']}} --patch '{{resource_definition| to_json}}'"
-#  k8s:
-#    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    validate: { fail_on_error: true }
-#    resource_definition: "{{resource_definition}}"
-  vars:
+  kubernetes.core.k8s:
+    state: patched
+    kind: Node
+    name: "{{ansible_facts['hostname']}}"
     resource_definition:
       apiVersion: v1
       kind: Node
@@ -100,12 +98,9 @@
 - name: node/edge | label and taint node-edge nodes with 'edge_ingress.node_role_name' role
   become: true
   delegate_to: "{{groups['controller'][0]}}"
-  shell: "cat <<EOF | kubectl apply -f -\n{{resource_definition | to_yaml}}\nEOF"
-#  k8s:
-#    kubeconfig: "{{k8s_home_kube_dir}}/config"
-#    validate: { fail_on_error: true }
-#    resource_definition: "{{resource_definition}}"
-  vars:
+  kubernetes.core.k8s:
+    apply: true
+    server_side_apply: {field_manager: ansible-playbook}
     resource_definition:
       apiVersion: v1
       kind: Node

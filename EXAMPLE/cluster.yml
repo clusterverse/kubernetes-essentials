@@ -47,11 +47,6 @@
   hosts: etcd
   tasks: [{ include_role: { name: "kubernetes/etcd", apply: { tags: ["kubernetes_etcd"] } }, tags: ["kubernetes_etcd"] }]
 
-- name: Kubernetes | Ensure the variables from /cluster_defs are loaded (in particular the new etcd certificate facts)
-  hosts: all
-  gather_facts: false
-  tasks: [{ include_role: { name: "clusterverse.clusterverse._dependencies", apply: { tags: ["always"] } }, tags: ["always"] }]
-
 - name: Kubernetes | k8s cluster common roles
   hosts: controller:node-worker:node-edge
   tasks: [{ include_role: { name: "kubernetes/k8s_cluster/common", apply: { tags: ["k8s_cluster_common"] } }, tags: ["k8s_cluster_common"] }]
@@ -65,7 +60,7 @@
   tasks: [{ include_role: { name: "kubernetes/k8s_cluster/node", apply: { tags: ["k8s_cluster_nodes"] } }, tags: ["k8s_cluster_nodes"] }]
 
 - name: Kubernetes | Install the k8 addons and, optionally, test applications
-  hosts: controller
+  hosts: controller[0]
   tasks:
     - { include_role: { name: "kubernetes/k8s_cluster/addon", apply: { tags: ["k8s_cluster_controller_addon"] } }, tags: ["k8s_cluster_controller_addon"] }
     - { include_role: { name: "kubernetes/k8s_cluster/testapps", apply: { tags: ["k8s_cluster_testapps"] } }, tags: ["k8s_cluster_testapps"], when: "testapps is defined" }

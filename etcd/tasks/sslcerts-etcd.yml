@@ -62,16 +62,16 @@
       notify: ["restart etcd"]
   when: (k8s_certs is not defined) or (k8s_certs['etcd-crt.pem'] is not defined) or (k8s_certs['etcd-key.pem'] is not defined) or (recreate_certs is defined and recreate_certs|bool)
 
-- name: "sslcerts/etcd | Reload {{ playbook_certs_k8s_file }} - (for all hosts - must be outside the run_once block above)"
+- name: "sslcerts/etcd | Reload {{ playbook_certs_k8s_file }} - (for all hosts in the play - must be outside the run_once block above)"
   include_vars: "{{ playbook_certs_k8s_file }}"
 
 
-- name: sslcerts/etcd | copy certs to remote
+- name: sslcerts/etcd | copy certs to etcd hosts
   block:
-    - name: sslcerts/etcd | create kubernetes cert directory on remote
+    - name: sslcerts/etcd | create kubernetes cert directory on etcd hosts
       file: path={{k8s_cert_dir}} state=directory
 
-    - name: sslcerts/etcd | Copy keys/certs to remotes
+    - name: sslcerts/etcd | Copy keys/certs to etcd hosts
       copy:
         content: "{{ item.val }}"
         dest: "{{ k8s_cert_dir }}/{{ item.key }}"
