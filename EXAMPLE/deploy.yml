@@ -17,12 +17,6 @@
   hosts: all:!not_target_hosts
   gather_facts: false
   tasks:
-    - name: clusterverse/deploy | Validate remote python version is supported by local ansible version, import_playbook 'raw_python39_install.yml' if not
-      block:
-        - { name: "clusterverse/deploy | wait_for (port 22)", ansible.builtin.wait_for: { port: 22, host: '{{ ansible_host }}', timeout: 30 }, delegate_to: localhost }
-        - { name: "clusterverse/deploy | gather_subset (python)", ansible.builtin.setup: { gather_subset: ["python"] }, ignore_errors: true, register: r__setup__python_version_check, vars: { ansible_ssh_retries: 10 } }
-        - { name: "clusterverse/deploy | raw_python39_install.yml", include_role: { name: "clusterverse.clusterverse.config", tasks_from: "raw_python39_install.yml" }, when: r__setup__python_version_check.failed is defined and r__setup__python_version_check.failed }
-
     - { name: "clusterverse/deploy | wait_for_connection", wait_for_connection: "", timeout: 300, tags: ["always"] }
     - { name: "clusterverse/deploy | clusterverse.config", include_role: { name: "clusterverse.clusterverse.config", apply: { tags: ["clusterverse_config"]} }, tags: ["clusterverse_config"] }
 

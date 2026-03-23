@@ -9,7 +9,7 @@ It was originally loosely based on the [kelseyhightower/kubernetes-the-hard-way]
   + The apiserver nodes are load-balanced using cloud-specific tools:
     + **Libvirt** / **ESXi**: keepalived (with IPVS real-servers on the same hosts as the directors).  This means the host that is owner of the VIP receives the request, but hands it off in the kernel for processing by one of the apiservers.
     + **AWS**: Network load balancers, configured for internal load-balancing.  One per-zone for resilience.
-  + [haproxy-ingress](https://haproxy-ingress.github.io/) is used as an ingress controller (using the [Gateway API](https://haproxy-ingress.github.io/docs/configuration/gateway-api/).  It runs as a daemonset on special _node-edge_ worker nodes with hostNetwork.
+  + [haproxy-ingress](https://haproxy-ingress.github.io/) is used as an ingress controller (using the [Gateway API](https://haproxy-ingress.github.io/docs/configuration/gateway-api/)).  It runs as a daemonset on special _node-edge_ worker nodes with hostNetwork.
 
 It supports (at present) AWS, libvirt(KVM/Qemu) and ESXi infrastructure.  
 

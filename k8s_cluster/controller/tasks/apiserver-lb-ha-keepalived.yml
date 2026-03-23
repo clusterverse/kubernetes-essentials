@@ -18,6 +18,26 @@
     state: present
     reload: true
 
+- name: apiserver-lb-ha-keepalived | Create /etc/keepalived directory
+  become: true
+  file:
+    path: /etc/keepalived
+    state: directory
+    mode: 0755
+
+- name: apiserver-lb-ha-keepalived | copy keepalived-bypass-ipvs.service
+  become: true
+  template: src=keepalived-bypass-ipvs.service.j2 dest=/etc/systemd/system/keepalived-bypass-ipvs.service
+  notify: ["reload controller systemd", "restart keepalived-bypass-ipvs"]
+
+- name: apiserver-lb-ha-keepalived | copy keepalived-bypass-ipvs.sh
+  become: true
+  template: src=keepalived-bypass-ipvs.sh.j2 dest=/etc/keepalived/keepalived-bypass-ipvs.sh owner=root group=root mode=0755
+  notify: ["restart keepalived-bypass-ipvs"]
+
+- name: apiserver-lb-ha-keepalived | flush handlers
+  meta: flush_handlers
+
 - name: apiserver-lb-ha-keepalived | Install keepalived package
   become: true
   apt:
@@ -43,11 +63,6 @@
     regexp: '^DAEMON_ARGS="(.*")'
     line: 'DAEMON_ARGS="--log-detail \1'
     backrefs: true
-  notify: ["restart keepalived"]
-
-- name: apiserver-lb-ha-keepalived | copy keepalived bypass_ipvs.sh
-  become: true
-  copy: src=keepalived_bypass_ipvs.sh dest=/etc/keepalived/bypass_ipvs.sh owner=root group=root mode=0755
   notify: ["restart keepalived"]
 
 - name: apiserver-lb-ha-keepalived | flush handlers

@@ -1,0 +1,150 @@
+#!/bin/bash
+# =============================================================================
+# Keepalived Bypass and FIFO Event Handler
+# Designed to allow a keepalived real-server to collocate with the director.
+# Automates NAT iptables changes when the VIP moves, via keepalived's notify_fifo.
+#
+# Run as a systemd service, started alongside keepalived.
+#
+# global_defs {
+#   ...
+#   notify_fifo /run/keepalived/vrrp_notify.fifo
+# }
+# =============================================================================
+
+set -uo pipefail
+
+# ----------------------------- Config -----------------------------
+VIP="{{ apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address') }}"
+FIFO="/run/keepalived/vrrp_notify.fifo"
+LOG_TAG="keepalived-bypass-ipvs"
+
+# ----------------------------- Logging -----------------------------
+log()  { logger -t "$LOG_TAG" -- "$*"; }
+err()  { logger -t "$LOG_TAG" -p daemon.err -- "ERROR: $*"; }
+
+# ----------------------------- Setup -----------------------------
+setup() {
+    local dir="$(dirname "$FIFO")"
+
+    mkdir -p "$dir"
+    chmod 755 "$dir"
+
+    # Remove stale non-FIFO file if present
+    if [[ -e "$FIFO" ]] && [[ ! -p "$FIFO" ]]; then
+        rm -f "$FIFO"
+        log "Removed stale file at $FIFO"
+    fi
+
+    if [[ ! -p "$FIFO" ]]; then
+        if ! mkfifo -m 600 "$FIFO"; then
+            err "Failed to create FIFO at $FIFO"
+            exit 1
+        fi
+        log "Created FIFO at $FIFO"
+    fi
+
+    log "Started FIFO handler (VIP=${VIP})"
+}
+
+
+# ----------------------------- iptables logic -----------------------------
+manage_rules() {
+    local action=$1
+
+    case "$action" in
+        add)
+            if ! iptables -t nat -S PREROUTING 2>/dev/null | grep -q "KEEPALIVED-BYPASS"; then
+                iptables -t nat -A PREROUTING -d "$VIP" -p tcp -m comment --comment "KEEPALIVED-BYPASS" -j REDIRECT
+                log "Added PREROUTING rule"
+            else
+                log "PREROUTING rule already present"
+            fi
+
+            if ! iptables -t nat -S OUTPUT 2>/dev/null | grep -q "KEEPALIVED-BYPASS"; then
+                iptables -t nat -A OUTPUT -d "$VIP" -p tcp -m comment --comment "KEEPALIVED-BYPASS" -j REDIRECT
+                log "Added OUTPUT rule"
+            else
+                log "OUTPUT rule already present"
+            fi
+            ;;
+
+        del)
+            if iptables -t nat -S PREROUTING 2>/dev/null | grep -q "KEEPALIVED-BYPASS"; then
+                while iptables -t nat -S PREROUTING 2>/dev/null | grep -q "KEEPALIVED-BYPASS"; do
+                    iptables -t nat -D PREROUTING -d "$VIP" -p tcp -m comment --comment "KEEPALIVED-BYPASS" -j REDIRECT 2>/dev/null
+                    log "Deleted PREROUTING rule"
+                done
+            else
+                log "No PREROUTING rules to delete"
+            fi
+
+            if iptables -t nat -S OUTPUT 2>/dev/null | grep -q "KEEPALIVED-BYPASS"; then
+                while iptables -t nat -S OUTPUT 2>/dev/null | grep -q "KEEPALIVED-BYPASS"; do
+                    iptables -t nat -D OUTPUT -d "$VIP" -p tcp -m comment --comment "KEEPALIVED-BYPASS" -j REDIRECT 2>/dev/null
+                    log "Deleted OUTPUT rule"
+                done
+            else
+                log "No OUTPUT rules to delete"
+            fi
+            ;;
+    esac
+}
+
+
+# ----------------------------- Startup state check -----------------------------
+# Derive initial iptables state from whether the VIP is currently bound,
+# rather than assuming a default. This makes restarts of this handler safe
+# regardless of what keepalived has already done.
+initial_state_check() {
+    log "Performing startup state check"
+
+    if ip -4 addr show | grep -q "${VIP}/"; then
+        log "Startup: VIP is present → treating as MASTER"
+        manage_rules "del"
+    else
+        log "Startup: VIP not present → treating as BACKUP"
+        manage_rules "add"
+    fi
+}
+
+
+# ----------------------------- Event loop -----------------------------
+process_events() {
+    # Hold the write end of the FIFO open so that the read loop never
+    # receives EOF when keepalived briefly stops writing between events
+    # (e.g. during a reload). Without this, the loop exits silently.
+    exec 3<>"$FIFO"
+
+    while IFS= read -r line <&3; do
+        [[ -z "$line" ]] && continue
+
+        log "Raw event: ${line}"
+
+        # FIFO format: INSTANCE|GROUP  <name>  <STATE>  <PRIORITY>
+        read -r ev_type ev_name ev_state ev_priority <<< "$line"
+
+        case "$ev_state" in
+            MASTER)
+                log "Remvoing iptables rules..."
+                manage_rules "del"
+                ;;
+            BACKUP|FAULT|DELETED|STOP)
+                log "Adding iptables rules..."
+                manage_rules "add"
+                ;;
+            *)
+                log "Unknown state '$ev_state' - ignoring"
+                ;;
+        esac
+
+
+    done
+}
+
+# ----------------------------- Main -----------------------------
+setup
+initial_state_check
+process_events
+
+log "FIFO handler exiting"

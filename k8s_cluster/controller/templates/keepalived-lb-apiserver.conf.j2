@@ -4,6 +4,13 @@ global_defs {
   enable_script_security
   vrrp_version 3
   lvs_flush
+  max_auto_priority
+
+  notify_priority_changes  false
+  fifo_write_vrrp_states_on_reload
+
+  # Using a fifo allows more efficient processing of notify events, and guarantees that they will be delivered in the correct sequence.
+  vrrp_notify_fifo "/run/keepalived/vrrp_notify.fifo"
 }
 
 vrrp_instance VI_1 {
@@ -28,9 +35,8 @@ vrrp_instance VI_1 {
     {{ apiserver.keepalived.vip_cidr }}
   }
 
-  notify_master "/etc/keepalived/bypass_ipvs.sh del {{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}"
-  notify_backup "/etc/keepalived/bypass_ipvs.sh add {{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}"
-  notify_fault "/etc/keepalived/bypass_ipvs.sh add {{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}"
+  # All servers are same priority, so no need to preempt
+  nopreempt
 }
 
 {% if apiserver.lb_ha_mgr is defined  and  apiserver.lb_ha_mgr == "keepalived_ipvs" %}

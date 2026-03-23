@@ -4,14 +4,23 @@
   become: true
   systemd:
     daemon_reload: true
-  throttle: 1
 
+## restart kube-apiservers each in-turn, ensuring each node is *really* back up (i.e. port 443 is open) before restarting the next.
+## This custom action plugin is a compromise, but there is apparently no alternative; see https://github.com/ansible/ansible/issues/80374
 - name: restart kube-apiserver
   become: true
-  service:
-    name:   kube-apiserver
-    enabled: true
-    state: restarted
+  dseeley.tasks_serial.tasks_serial:
+    tasks:
+      - name: service
+        args:
+          name: kube-apiserver
+          state: restarted
+          enabled: true
+      - name: wait_for
+        args:
+          host: localhost
+          port: 443
+          timeout: 10
   throttle: 1
 
 - name: restart kube-controller-manager
@@ -30,9 +39,28 @@
     state: restarted
   throttle: 1
 
+## restart keepalived each in-turn, ensuring each node is *really* back up (i.e. port 443 is open) before restarting the next.
+## This custom action plugin is a compromise, but there is apparently no alternative; see https://github.com/ansible/ansible/issues/80374
 - name: restart keepalived
   become: true
+  dseeley.tasks_serial.tasks_serial:
+    tasks:
+      - name: service
+        args:
+          name: keepalived
+          state: restarted
+          enabled: true
+      - name: wait_for
+        args:
+          host: localhost
+          port: 443
+          timeout: 10
+  throttle: 1
+
+- name: restart keepalived-bypass-ipvs
+  become: true
   service:
-    name: keepalived
+    name: keepalived-bypass-ipvs
     enabled: true
     state: restarted
+  throttle: 1
