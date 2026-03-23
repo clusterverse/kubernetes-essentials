@@ -64,7 +64,7 @@ spec:
   parentRefs:
     - name: pyechoserver-gw
   hostnames:
-    - "pyechoserver.dev.k8s.chezdj.com"
+    - {{'pyechoserver.' + cluster_vars.dns_domain}}
   rules:
     - backendRefs:
         - name: pyechoserver-svc

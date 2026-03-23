@@ -77,7 +77,7 @@ spec:
   parentRefs:
     - name: nginx-test-gw
   hostnames:
-    - nginx-test.dev.k8s.chezdj.com
+    - {{'nginx-test.' + cluster_vars.dns_domain}}
   rules:
     - backendRefs:
         - name: nginx-test-svc
