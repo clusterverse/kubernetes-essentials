@@ -4,18 +4,18 @@
   include_tasks: sslcerts-scheduler.yml
 
 - name: controller/config/scheduler | create config directory
-  become: yes
+  become: true
   file: path={{k8s_config_dir}}/ state=directory
 
 - name: controller/config/scheduler | write out kubeconfig
-  become: yes
+  become: true
   copy:
     content: |
       apiVersion: v1
       clusters:
       - cluster:
           certificate-authority-data: {{ ssl_ca['ca-crt.pem'] | b64encode }}
-          server: "{% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
+          server: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
         name: {{cluster_name}}
       contexts:
       - context:
@@ -31,11 +31,11 @@
           client-certificate-data: {{ k8s_certs['scheduler-crt.pem'] | b64encode }}
           client-key-data: {{ k8s_certs['scheduler-key.pem'] | b64encode }}
     dest: "{{k8s_config_dir}}/kube-scheduler.kubeconfig"
-    force: yes
+    force: true
   notify: ["restart kube-scheduler"]
 
 #- name: controller/config/scheduler | Create the kube-scheduler-config.yaml configuration file
-#  become: yes
+#  become: true
 #  copy:
 #    content: |
 #      kind: KubeSchedulerConfiguration
@@ -45,11 +45,11 @@
 #      leaderElection:
 #        leaderElect: true
 #    dest: "{{ k8s_config_dir }}/kube-scheduler.yaml"
-#    force: yes
+#    force: true
 #  notify: ["restart kube-scheduler"]
 
 - name: controller/config/scheduler | Create the kube-scheduler.service systemd unit file
-  become: yes
+  become: true
   copy:
     content: |
       [Unit]
@@ -64,5 +64,5 @@
       [Install]
       WantedBy=multi-user.target
     dest: "/etc/systemd/system/kube-scheduler.service"
-    force: yes
+    force: true
   notify: ["reload controller systemd", "restart kube-scheduler"]

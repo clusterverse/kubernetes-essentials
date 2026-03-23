@@ -2,4 +2,4 @@
 
 - name: Run cloud-specific clean (if defined)
   include_tasks: "{{ item }}"
-  with_first_found: [{ files: ["clean_{{cluster_vars.type}}.yml"], skip: true }]
+  with_first_found: [{ files: ["clean_{{cluster_vars.cloud_type}}.yml"], skip: true }]

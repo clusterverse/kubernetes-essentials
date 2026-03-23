@@ -35,7 +35,7 @@
             type: "CNAME"
             private_zone: "{{ item.Config.PrivateZone }}"
           register: r__route53_cname
-          ignore_errors: yes
+          ignore_errors: true
           with_items: "{{ r__route53_info__zones.HostedZones | json_query(\"[?Name==`\" + cluster_vars.dns_nameserver_zone + \".`]\") }}"
 
         - name: apiserver-lb-awsnlb | debug r__route53_cname

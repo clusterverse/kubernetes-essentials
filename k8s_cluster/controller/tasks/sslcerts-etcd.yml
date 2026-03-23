@@ -1,15 +1,18 @@
 ---
 
-- include_role:
-    name: kubernetes/etcd
-    tasks_from: sslcerts-etcd.yml
+- name: "controller/sslcerts/etcd | Reload {{ playbook_certs_k8s_file }} - these should have been created already in an earlier play"
+  include_vars: "{{ playbook_certs_k8s_file }}"
 
-- name: controller/sslcerts/etcd | Copy keys/certs to remotes
+- name: controller/sslcerts/etcd | include kubernetes/etcd/sslcerts-etcd.yml if k8s_certs is not defined or (recreate_certs is defined)
+  include_role: { name: kubernetes/etcd, tasks_from: sslcerts-etcd.yml }
+  when: (k8s_certs is not defined) or (k8s_certs['etcd-crt.pem'] is not defined) or (k8s_certs['etcd-key.pem'] is not defined) or (recreate_certs is defined and recreate_certs|bool)
+
+- name: controller/sslcerts/etcd | Copy keys/certs to controllers
   block:
-    - name: controller/sslcerts/etcd | create kubernetes cert directory on remotes
+    - name: controller/sslcerts/etcd | create kubernetes cert directory on controllers
       file: path={{k8s_cert_dir}} state=directory
 
-    - name: controller/sslcerts/etcd | Copy keys/certs to remotes
+    - name: controller/sslcerts/etcd | Copy keys/certs to controllers
       copy:
         content: "{{ item.val }}"
         dest: "{{ k8s_cert_dir }}/{{ item.key }}"
@@ -20,4 +23,4 @@
         - { key: 'etcd-key.pem', val: "{{k8s_certs['etcd-key.pem']}}", mode: '0600'}
         - { key: 'ca-crt.pem', val: "{{ssl_ca['ca-crt.pem']}}", mode: '0644'}
       notify: ["restart kube-apiserver"]
-  become: yes
+  become: true

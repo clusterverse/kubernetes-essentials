@@ -1,52 +1,37 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-deployment
+  name: nginx-test-deployment
   namespace: default
 spec:
   replicas: 6
   selector:
     matchLabels:
-      app: nginx-test
+      app.kubernetes.io/name: nginx-test
   template:
     metadata:
       labels:
-        app: nginx-test
+        app.kubernetes.io/name: nginx-test
     spec:
-{#      affinity:#}
-{#        podAntiAffinity:#}
-{#          preferredDuringSchedulingIgnoredDuringExecution:#}
-{#            - podAffinityTerm:#}
-{#                labelSelector:#}
-{#                  matchExpressions: [ { 'key': 'app', 'operator': 'In', 'values': ['nginx-test'] } ]#}
-{#                topologyKey: "topology.kubernetes.io/zone"#}
-{#              weight: 100#}
-{#            - podAffinityTerm:#}
-{#                labelSelector:#}
-{#                  matchExpressions: [ { 'key': 'app', 'operator': 'In', 'values': ['nginx-test'] } ]#}
-{#                topologyKey: "kubernetes.io/hostname"#}
-{#              weight: 100#}
       topologySpreadConstraints:
-        - maxSkew: 1    # ignored as we're setting whenUnsatisfiable: ScheduleAnyway
+        - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
           whenUnsatisfiable: ScheduleAnyway
-          labelSelector: { matchLabels: { app: nginx-test } }
-        - maxSkew: 1    # ignored as we're setting whenUnsatisfiable: ScheduleAnyway
+          labelSelector: { matchLabels: { app.kubernetes.io/name: nginx-test } }
+        - maxSkew: 2
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway
-          labelSelector: { matchLabels: { app: nginx-test } }
+          labelSelector: { matchLabels: { app.kubernetes.io/name: nginx-test } }
       initContainers:
         - name: configworkdir
           image: busybox
-          command: [ "sh", "-c", 'echo "<h1>\$(hostname)</h1>" > /workdir/index.html' ]
+          command: [ "sh", "-c", 'echo "<h1>$(hostname)</h1>" > /workdir/index.html' ]
           volumeMounts:
             - name: workdir
               mountPath: "/workdir"
       containers:
-        - name: nginx-test
+        - name: nginx
           image: nginx:latest
-#          command: [ "sh", "-c", 'sed -E "s/^(\\s+)(location \\/ \\{)$/\\1\\2\n\\1\\1sendfile off;/" /etc/nginx/conf.d/default.conf' ]
           volumeMounts:
             - name: workdir
               mountPath: /usr/share/nginx/html
@@ -58,35 +43,42 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: nginx-test
+  name: nginx-test-svc
   namespace: default
-  labels:
-    app: nginx-test
 spec:
   selector:
-    app: nginx-test
+    app.kubernetes.io/name: nginx-test
   ports:
-  - port: 80
-    protocol: TCP
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
 metadata:
-  name: nginx-test
+  name: nginx-test-gw
   namespace: default
-  annotations:
-    ingress.kubernetes.io/rewrite-target: /
 spec:
-  ingressClassName: haproxy
+  gatewayClassName: haproxy
+  listeners:
+    - name: http-listener
+      port: 80
+      protocol: HTTP
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: nginx-test-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: nginx-test-gw
+  hostnames:
+    - {{'nginx-test.' + cluster_vars.dns_domain}}
   rules:
-    - http:
-        paths:
-          - path: /{% if cluster_vars.dns_user_domain is not defined  or  cluster_vars.dns_user_domain == '' %}nginx{% endif %}{{''}}
-            pathType: Prefix
-            backend:
-              service:
-                name: nginx-test
-                port:
-                  number: 80
-      {% if cluster_vars.dns_user_domain is defined and cluster_vars.dns_user_domain != "" %}host: "nginx-test.{{cluster_vars.dns_user_domain}}"{% endif %}
+    - backendRefs:
+        - name: nginx-test-svc
+          port: 80

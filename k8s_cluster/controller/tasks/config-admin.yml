@@ -4,18 +4,18 @@
   include_tasks: sslcerts-admin.yml
 
 - name: controller/config/admin | create config directory
-  become: yes
+  become: true
   file: path={{k8s_home_kube_dir}} state=directory
 
 - name: controller/config/admin | write out kubeconfig
-  become: yes
+  become: true
   copy:
     content: |
       apiVersion: v1
       clusters:
       - cluster:
           certificate-authority-data: {{ ssl_ca['ca-crt.pem'] | b64encode }}
-          server: "{% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
+          server: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
         name: {{cluster_name}}
       contexts:
       - context:
@@ -31,4 +31,4 @@
           client-certificate-data: {{ k8s_certs['admin-crt.pem'] | b64encode }}
           client-key-data: {{ k8s_certs['admin-key.pem'] | b64encode }}
     dest: "{{k8s_home_kube_dir}}/config"
-    force: yes
+    force: true

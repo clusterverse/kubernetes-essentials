@@ -1,6 +1,6 @@
 ---
 
-- assert: { that: "apiserver.url is defined and apiserver.url != ''", fail_msg: "Please define apiserver.url" }
+- assert: { that: "apiserver.url is defined and apiserver.url is truthy", fail_msg: "Please define apiserver.url" }
 
 - name: apiserver-lb-awsnlb | ec2_instance_info
   ec2_instance_info:
@@ -52,7 +52,7 @@
         Port: "{{ apiserver.secure_port }}"
         DefaultActions: [{ Type: forward, TargetGroupName: "{{r__elb_target_group.target_group_name}}" }]
     state: present
-    wait: yes
+    wait: true
   delegate_to: localhost
   run_once: true
   register: r__elb_network_lb

@@ -1,68 +1,65 @@
 ---
 
 - name: apiserver-lb-ha-keepalived | Allow apps to bind on non-local addresses (net.ipv4.ip_nonlocal_bind=1)
-  become: yes
+  become: true
   sysctl:
     name: net.ipv4.ip_nonlocal_bind
     value: 1
-    sysctl_set: yes
+    sysctl_set: true
     state: present
-    reload: yes
+    reload: true
 
 - name: apiserver-lb-ha-keepalived | Accept packets with local source addresses (net.ipv4.conf.eth0.accept_local=1)
-  become: yes
+  become: true
   sysctl:
-    name: "net.ipv4.conf.{{ansible_default_ipv4.interface}}.accept_local"
+    name: "net.ipv4.conf.{{ansible_facts.default_ipv4.interface}}.accept_local"
     value: 1
-    sysctl_set: yes
+    sysctl_set: true
     state: present
-    reload: yes
-
-#- name: apiserver-lb-ha-keepalived | Add the br-netfilter module
-#  become: yes
-#  modprobe:
-#    name: br-netfilter
-#    state: present
-#
-#- name: apiserver-lb-ha-keepalived | (net.bridge.bridge-nf-call-iptables=1)
-#  become: yes
-#  sysctl:
-#    name: net.bridge.bridge-nf-call-iptables
-#    value: 1
-#    sysctl_set: yes
-#    state: present
-#    reload: yes
+    reload: true
 
 - name: apiserver-lb-ha-keepalived | Install keepalived package
-  become: yes
+  become: true
   apt:
-    update_cache: yes
+    update_cache: true
     name: ['keepalived']
     state: present
   notify: ["restart keepalived"]
 
-- name: apiserver-lb-ha-keepalived | Configure keepalived
-  become: yes
+- name: apiserver-lb-ha-keepalived | copy keepalived-bypass-ipvs.service
+  become: true
+  template: src=keepalived-bypass-ipvs.service.j2 dest=/etc/systemd/system/keepalived-bypass-ipvs.service
+  notify: ["reload controller systemd", "restart keepalived-bypass-ipvs"]
+
+- name: apiserver-lb-ha-keepalived | copy keepalived-bypass-ipvs.sh
+  become: true
+  template: src=keepalived-bypass-ipvs.sh.j2 dest=/etc/keepalived/keepalived-bypass-ipvs.sh owner=root group=root mode=0755
+  notify: ["restart keepalived-bypass-ipvs"]
+
+- name: apiserver-lb-ha-keepalived | Configure keepalived - create /run/keepalived
+  become: true
+  file:
+    path: /run/keepalived
+    state: directory
+    mode: 0755
+
+- name: apiserver-lb-ha-keepalived | Configure keepalived - create /etc/keepalived/keepalived.conf
+  become: true
   template:
     src: keepalived-lb-apiserver.conf.j2
     dest: /etc/keepalived/keepalived.conf
   vars:
-    apiserver_keepalived_real_servers: "{{ groups['controller'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | sort }}"
-    apiserver_keepalived_peers: "{{ groups['controller'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | difference(ansible_host) | sort }}"
+    apiserver_keepalived_real_servers: "{{ groups['controller'] | map('extract', hostvars, ['ansible_facts', 'default_ipv4', 'address']) | sort }}"
+    apiserver_keepalived_peers: "{{ groups['controller'] | map('extract', hostvars, ['ansible_facts', 'default_ipv4', 'address']) | difference(ansible_host) | sort }}"
   notify: ["restart keepalived"]
 
 - name: apiserver-lb-ha-keepalived | Configure keepalived logging
-  become: yes
+  become: true
   lineinfile:
     dest: "/etc/default/keepalived"
     regexp: '^DAEMON_ARGS="(.*")'
     line: 'DAEMON_ARGS="--log-detail \1'
-    backrefs: yes
-  notify: ["restart keepalived"]
-
-- name: apiserver-lb-ha-keepalived | copy keepalived bypass_ipvs.sh
-  become: yes
-  copy: src=keepalived_bypass_ipvs.sh dest=/etc/keepalived/bypass_ipvs.sh owner=root group=root mode=0755
+    backrefs: true
   notify: ["restart keepalived"]
 
 - name: apiserver-lb-ha-keepalived | flush handlers

@@ -2,7 +2,7 @@
 
 ## NOTE: THIS DOES NOT WORK - because health-checks are not valid for rfc1918 IPs
 
-- assert: { that: "apiserver.url is defined and apiserver.url != ''", fail_msg: "Please define apiserver.url" }
+- assert: { that: "apiserver.url is defined and apiserver.url is truthy", fail_msg: "Please define apiserver.url" }
 
 - block:
     - name: apiserver-lb-awsdns | create/update health-check
@@ -16,7 +16,7 @@
         resource_path: "/livez"
         request_interval: 10
         failure_threshold: 2
-        validate_certs: no
+        validate_certs: false
       register: r__route53_health_check
       delegate_to: localhost
       run_once: true
@@ -38,7 +38,7 @@
         private_zone: "{{cluster_vars.route53_private_zone | default(true)}}"
         overwrite: true
         health_check: "{{ results | json_query(\"[?item.ip_address == '\" + hostvars[item]['ansible_host'] + \"'].health_check.id\")  }}"
-        wait: yes
+        wait: true
       delegate_to: localhost
       run_once: true
       with_items: "{{ groups['controller'] | sort }}"

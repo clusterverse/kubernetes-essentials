@@ -4,11 +4,11 @@
   include_tasks: sslcerts-kubeproxy.yml
 
 - name: node/config/kube-proxy | create bin directory
-  become: yes
+  become: true
   file: path={{k8s_bin_dir}} state=directory
 
 - name: node/config/kube-proxy | Download & install
-  become: yes
+  become: true
   get_url:
     url: "{{k8s_artifact_location}}/kube-proxy"
     dest: "{{k8s_bin_dir}}/kube-proxy"
@@ -16,18 +16,18 @@
   notify: ["restart kube-proxy"]
 
 - name: node/config/kube-proxy | create config directory
-  become: yes
+  become: true
   file: path={{k8s_config_dir}}/kube-proxy state=directory
 
 - name: node/config/kube-proxy | write out kubeconfig
-  become: yes
+  become: true
   copy:
     content: |
       apiVersion: v1
       clusters:
       - cluster:
           certificate-authority-data: {{ ssl_ca['ca-crt.pem'] | b64encode }}
-          server: "{% if apiserver.url is defined and apiserver.url != '' %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr != '' %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
+          server: "{% if apiserver.url is defined and apiserver.url is truthy %}{{ apiserver.url }}{% elif apiserver.keepalived.vip_cidr is defined and apiserver.keepalived.vip_cidr is truthy %}https://{{apiserver.keepalived.vip_cidr | ansible.utils.ipaddr('address')}}{% endif %}:{{apiserver.secure_port}}"
         name: {{cluster_name}}
       contexts:
       - context:
@@ -43,11 +43,11 @@
           client-certificate-data: {{ k8s_certs['kubeproxy-crt.pem'] | b64encode }}
           client-key-data: {{  k8s_certs['kubeproxy-key.pem'] | b64encode }}
     dest: "{{ k8s_config_dir }}/kube-proxy/kubeconfig"
-    force: yes
+    force: true
   notify: ["restart kube-proxy"]
 
 - name: node/config/kube-proxy | Create the kube-proxy-config.yaml configuration file
-  become: yes
+  become: true
   copy:
     content: |
       kind: KubeProxyConfiguration
@@ -57,11 +57,11 @@
       mode: "iptables"
       clusterCIDR: "{{k8s_network.cluster_cidr}}"
     dest: "{{ k8s_config_dir }}/kube-proxy/kube-proxy-config.yaml"
-    force: yes
+    force: true
   notify: ["restart kube-proxy"]
 
 - name: node/config/kube-proxy | Create the kube-proxy.service systemd unit file
-  become: yes
+  become: true
   copy:
     content: |
       [Unit]
@@ -73,5 +73,5 @@
       Restart=on-failure
       RestartSec=5
     dest: "/etc/systemd/system/kube-proxy.service"
-    force: yes
+    force: true
   notify: ["reload node systemd", "restart kube-proxy"]

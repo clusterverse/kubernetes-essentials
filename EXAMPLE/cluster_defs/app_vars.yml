@@ -1,20 +1,25 @@
 ---
 
-k8s_version: 1.30.0
-k8s_artifact_location: "https://storage.googleapis.com/kubernetes-release/release/v{{k8s_version}}/bin/linux/{{'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture}}"
+#k8s_version: "{{ lookup('url', 'https://dl.k8s.io/release/stable.txt') | trim | regex_replace('^v', '') | default('1.35.3') }}"
+k8s_version: "1.35.3"
+k8s_artifact_location: "https://dl.k8s.io/v{{k8s_version}}/bin/linux/{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}"
 
 ### containerd
-containerd_version: 1.7.15
-containerd_artifact_location: "https://github.com/containerd/containerd/releases/download/v{{containerd_version}}/containerd-{{containerd_version}}-linux-{{'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture}}.tar.gz"
+#containerd_version: "{{ lookup('url', 'https://api.github.com/repos/containerd/containerd/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('2.2.2') }}"
+containerd_version: "2.2.2"
+containerd_artifact_location: "https://github.com/containerd/containerd/releases/download/v{{containerd_version}}/containerd-{{containerd_version}}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
 
-runc_version: 1.1.12
-runc_artifact_location: "https://github.com/opencontainers/runc/releases/download/v{{runc_version}}/runc.{{'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture}}"
+#nerdctl_version: "{{ lookup('url', 'https://api.github.com/repos/containerd/nerdctl/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('2.2.1') }}"
+nerdctl_version: "2.2.1"
+nerdctl_artifact_location: "https://github.com/containerd/nerdctl/releases/download/v{{nerdctl_version}}/nerdctl-{{nerdctl_version}}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
 
-cni_plugin_version: 1.4.1
-cni_plugin_artifact_location: "https://github.com/containernetworking/plugins/releases/download/v{{cni_plugin_version}}/cni-plugins-linux-{{'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture}}-v{{cni_plugin_version}}.tgz"
+#runc_version: "{{ lookup('url', 'https://api.github.com/repos/opencontainers/runc/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.4.1') }}"
+runc_version: "1.4.1"
+runc_artifact_location: "https://github.com/opencontainers/runc/releases/download/v{{runc_version}}/runc.{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}"
 
-nerdctl_version: 1.7.5
-nerdctl_artifact_location: "https://github.com/containerd/nerdctl/releases/download/v{{nerdctl_version}}/nerdctl-{{nerdctl_version}}-linux-{{'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture}}.tar.gz"
+#cni_plugin_version: "{{ lookup('url', 'https://api.github.com/repos/containernetworking/plugins/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.9.1') }}"
+cni_plugin_version: "1.9.1"
+cni_plugin_artifact_location: "https://github.com/containernetworking/plugins/releases/download/v{{cni_plugin_version}}/cni-plugins-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}-v{{cni_plugin_version}}.tgz"
 ### containerd
 
 k8s_network:
@@ -24,16 +29,33 @@ k8s_network:
   dns_ip: 10.233.0.10                 # Cluster DNS server IP (coredns).  Must be from {{k8s_network.service_ip_cidr}} - traditionally x.x.x.10
   cluster_tld: "kubernetes"           # Cluster DNS TLD
 
-flannel_version: v0.25.1
+flannel_version: v0.28.1              # from ghcr.io/flannel-io/flannel
 
-descheduler_version: v0.29.0
+#descheduler_version: "{{ lookup('url', 'https://api.github.com/repos/kubernetes-sigs/descheduler/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('0.35.1') }}"
+descheduler_version: "0.35.1"
 
-coredns_image: registry.k8s.io/coredns/coredns:v1.11.1
+#coredns_version: "{{ lookup('url', 'https://api.github.com/repos/coredns/coredns/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.14.2') }}"
+coredns_version: "1.14.2"
 
-kube_dashboard_image: kubernetesui/dashboard:v2.7.0
+#coredns_version: "{{ lookup('url', 'https://api.github.com/repos/etcd-io/etcd/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('3.6.9') }}"
+etcd_version: v3.6.9
+etcd:
+  client_cert_file: &etcd_cert_file "{{k8s_cert_dir}}/etcd-crt.pem"
+  client_key_file: &etcd_key_file "{{k8s_cert_dir}}/etcd-key.pem"
+  client_trusted_ca_file: &etcd_trusted_ca_file "{{ca_crt_filepath}}"
+  peer_cert_file: *etcd_cert_file
+  peer_key_file: *etcd_key_file
+  peer_trusted_ca_file: *etcd_trusted_ca_file
+  download_url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
+  bin_dir: /usr/local/bin
+  data_dir: /var/cache/etcd/state
+  user: etcd
+  client_port: 2379
+  peer_port: 2380
+
 
 apiserver:
-  url: "{% if cluster_vars.dns_server is defined and cluster_vars.dns_server != '' %}https://{{cluster_name}}-apiserver.{{cluster_vars.dns_nameserver_zone}}{% endif %}"
+  url: "{% if cluster_vars.dns_server is defined and cluster_vars.dns_server is truthy %}https://{{cluster_name}}-apiserver.{{cluster_vars.dns_nameserver_zone}}{% endif %}"
   secure_port: 443
   lb_ha_mgr: ""         # The load-balancing/HA solution for apiserver (because of https://github.com/kubernetes/kubernetes/issues/18174).  e.g.: keepalived_ipvs, awsnlb, gcp_dns_healthcheck
   keepalived:
@@ -42,9 +64,9 @@ apiserver:
 edge_ingress:
   node_role_name: "edge-ingress"
   controller: ""        # The Ingress Controller.  e.g.: haproxy-ingress
-  ha_mgr: ""            # The HA mechanism for node-edge (ingress) nodes.  e.g.: kube-keepalived-vip, awsnlb, gcp_dns_healthcheck
+  ha_mgr: ""            # The HA mechanism for node-edge (ingress) nodes.  e.g.: kube-vip, awsnlb, gcp_dns_healthcheck
   keepalived:
-    vip_cidr: ""        # MUST be present for edge_ingress.ha_mgr="kube-keepalived-vip"
+    vip_cidr: ""        # MUST be present for edge_ingress.ha_mgr="kube-vip"
 
 k8s_bin_dir: /opt/kubernetes
 k8s_config_dir: /etc/kubernetes
@@ -63,18 +85,3 @@ admin_crt_filepath: "{{k8s_cert_dir}}/admin-crt.pem"
 admin_key_filepath: "{{k8s_cert_dir}}/admin-key.pem"
 serviceaccount_crt_filepath: "{{k8s_cert_dir}}/serviceaccount-crt.pem"
 serviceaccount_key_filepath: "{{k8s_cert_dir}}/serviceaccount-key.pem"
-
-etcd_version: v3.5.13
-etcd:
-  client_cert_file: &etcd_cert_file "{{k8s_cert_dir}}/etcd-crt.pem"
-  client_key_file: &etcd_key_file "{{k8s_cert_dir}}/etcd-key.pem"
-  client_trusted_ca_file: &etcd_trusted_ca_file "{{ca_crt_filepath}}"
-  peer_cert_file: *etcd_cert_file
-  peer_key_file: *etcd_key_file
-  peer_trusted_ca_file: *etcd_trusted_ca_file
-  download_url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-{{'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture}}.tar.gz"
-  bin_dir: /usr/local/bin
-  data_dir: /var/cache/etcd/state
-  user: etcd
-  client_port: 2379
-  peer_port: 2380
