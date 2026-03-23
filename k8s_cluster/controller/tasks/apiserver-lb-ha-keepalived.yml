@@ -18,12 +18,13 @@
     state: present
     reload: true
 
-- name: apiserver-lb-ha-keepalived | Create /etc/keepalived directory
+- name: apiserver-lb-ha-keepalived | Install keepalived package
   become: true
-  file:
-    path: /etc/keepalived
-    state: directory
-    mode: 0755
+  apt:
+    update_cache: true
+    name: ['keepalived']
+    state: present
+  notify: ["restart keepalived"]
 
 - name: apiserver-lb-ha-keepalived | copy keepalived-bypass-ipvs.service
   become: true
@@ -35,18 +36,14 @@
   template: src=keepalived-bypass-ipvs.sh.j2 dest=/etc/keepalived/keepalived-bypass-ipvs.sh owner=root group=root mode=0755
   notify: ["restart keepalived-bypass-ipvs"]
 
-- name: apiserver-lb-ha-keepalived | flush handlers
-  meta: flush_handlers
-
-- name: apiserver-lb-ha-keepalived | Install keepalived package
+- name: apiserver-lb-ha-keepalived | Configure keepalived - create /run/keepalived
   become: true
-  apt:
-    update_cache: true
-    name: ['keepalived']
-    state: present
-  notify: ["restart keepalived"]
+  file:
+    path: /run/keepalived
+    state: directory
+    mode: 0755
 
-- name: apiserver-lb-ha-keepalived | Configure keepalived
+- name: apiserver-lb-ha-keepalived | Configure keepalived - create /etc/keepalived/keepalived.conf
   become: true
   template:
     src: keepalived-lb-apiserver.conf.j2

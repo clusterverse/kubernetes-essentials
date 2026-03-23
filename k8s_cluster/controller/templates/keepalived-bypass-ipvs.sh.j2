@@ -126,7 +126,7 @@ process_events() {
 
         case "$ev_state" in
             MASTER)
-                log "Remvoing iptables rules..."
+                log "Removing iptables rules..."
                 manage_rules "del"
                 ;;
             BACKUP|FAULT|DELETED|STOP)

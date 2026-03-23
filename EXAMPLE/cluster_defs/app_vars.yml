@@ -1,24 +1,24 @@
 ---
 
-#k8s_version: "{{ lookup('url', 'https://dl.k8s.io/release/stable.txt') | trim | regex_replace('^v', '') | default('1.35.2') }}"
-k8s_version: "1.35.2"
+#k8s_version: "{{ lookup('url', 'https://dl.k8s.io/release/stable.txt') | trim | regex_replace('^v', '') | default('1.35.3') }}"
+k8s_version: "1.35.3"
 k8s_artifact_location: "https://dl.k8s.io/v{{k8s_version}}/bin/linux/{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}"
 
 ### containerd
-#containerd_version: "{{ lookup('url', 'https://api.github.com/repos/containerd/containerd/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('2.2.1') }}"
-containerd_version: "2.2.1"
+#containerd_version: "{{ lookup('url', 'https://api.github.com/repos/containerd/containerd/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('2.2.2') }}"
+containerd_version: "2.2.2"
 containerd_artifact_location: "https://github.com/containerd/containerd/releases/download/v{{containerd_version}}/containerd-{{containerd_version}}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
 
 #nerdctl_version: "{{ lookup('url', 'https://api.github.com/repos/containerd/nerdctl/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('2.2.1') }}"
-nerdctl_version: "{{containerd_version}}"
+nerdctl_version: "2.2.1"
 nerdctl_artifact_location: "https://github.com/containerd/nerdctl/releases/download/v{{nerdctl_version}}/nerdctl-{{nerdctl_version}}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
 
-#runc_version: "{{ lookup('url', 'https://api.github.com/repos/opencontainers/runc/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.4.0') }}"
-runc_version: "1.4.0"
+#runc_version: "{{ lookup('url', 'https://api.github.com/repos/opencontainers/runc/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.4.1') }}"
+runc_version: "1.4.1"
 runc_artifact_location: "https://github.com/opencontainers/runc/releases/download/v{{runc_version}}/runc.{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}"
 
-#cni_plugin_version: "{{ lookup('url', 'https://api.github.com/repos/containernetworking/plugins/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.9.0') }}"
-cni_plugin_version: "1.9.0"
+#cni_plugin_version: "{{ lookup('url', 'https://api.github.com/repos/containernetworking/plugins/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.9.1') }}"
+cni_plugin_version: "1.9.1"
 cni_plugin_artifact_location: "https://github.com/containernetworking/plugins/releases/download/v{{cni_plugin_version}}/cni-plugins-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}-v{{cni_plugin_version}}.tgz"
 ### containerd
 
@@ -31,11 +31,27 @@ k8s_network:
 
 flannel_version: v0.28.1              # from ghcr.io/flannel-io/flannel
 
-#descheduler_version: "{{ lookup('url', 'https://api.github.com/repos/kubernetes-sigs/descheduler/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('0.35.0') }}"
-descheduler_version: "0.35.0"
+#descheduler_version: "{{ lookup('url', 'https://api.github.com/repos/kubernetes-sigs/descheduler/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('0.35.1') }}"
+descheduler_version: "0.35.1"
 
-#coredns_version: "{{ lookup('url', 'https://api.github.com/repos/coredns/coredns/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.14.1') }}"
-coredns_version: "1.14.1"
+#coredns_version: "{{ lookup('url', 'https://api.github.com/repos/coredns/coredns/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.14.2') }}"
+coredns_version: "1.14.2"
+
+#coredns_version: "{{ lookup('url', 'https://api.github.com/repos/etcd-io/etcd/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('3.6.9') }}"
+etcd_version: v3.6.9
+etcd:
+  client_cert_file: &etcd_cert_file "{{k8s_cert_dir}}/etcd-crt.pem"
+  client_key_file: &etcd_key_file "{{k8s_cert_dir}}/etcd-key.pem"
+  client_trusted_ca_file: &etcd_trusted_ca_file "{{ca_crt_filepath}}"
+  peer_cert_file: *etcd_cert_file
+  peer_key_file: *etcd_key_file
+  peer_trusted_ca_file: *etcd_trusted_ca_file
+  download_url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
+  bin_dir: /usr/local/bin
+  data_dir: /var/cache/etcd/state
+  user: etcd
+  client_port: 2379
+  peer_port: 2380
 
 
 apiserver:
@@ -69,18 +85,3 @@ admin_crt_filepath: "{{k8s_cert_dir}}/admin-crt.pem"
 admin_key_filepath: "{{k8s_cert_dir}}/admin-key.pem"
 serviceaccount_crt_filepath: "{{k8s_cert_dir}}/serviceaccount-crt.pem"
 serviceaccount_key_filepath: "{{k8s_cert_dir}}/serviceaccount-key.pem"
-
-etcd_version: v3.5.13
-etcd:
-  client_cert_file: &etcd_cert_file "{{k8s_cert_dir}}/etcd-crt.pem"
-  client_key_file: &etcd_key_file "{{k8s_cert_dir}}/etcd-key.pem"
-  client_trusted_ca_file: &etcd_trusted_ca_file "{{ca_crt_filepath}}"
-  peer_cert_file: *etcd_cert_file
-  peer_key_file: *etcd_key_file
-  peer_trusted_ca_file: *etcd_trusted_ca_file
-  download_url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
-  bin_dir: /usr/local/bin
-  data_dir: /var/cache/etcd/state
-  user: etcd
-  client_port: 2379
-  peer_port: 2380
