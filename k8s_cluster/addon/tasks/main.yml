@@ -1,5 +1,8 @@
 ---
 
+  # Note: To generate flannel.yml (https://github.com/flannel-io/flannel/blob/master/README.md#deploying-flannel-with-helm):
+  # helm repo add flannel https://flannel-io.github.io/flannel/
+  # helm template flannel --namespace kube-system flannel/flannel > flannel.yml
 - name: addon/flannel | apply config
   become: true
   run_once: true

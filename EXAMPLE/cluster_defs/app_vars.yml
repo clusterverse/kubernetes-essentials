@@ -37,8 +37,6 @@ descheduler_version: "0.35.0"
 #coredns_version: "{{ lookup('url', 'https://api.github.com/repos/coredns/coredns/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.14.1') }}"
 coredns_version: "1.14.1"
 
-#TODO: Replace dashboard with Headlamp https://headlamp.dev/docs/latest/installation/in-cluster/#using-simple-yaml
-#kube_dashboard_image: kubernetesui/dashboard:v2.7.0
 
 apiserver:
   url: "{% if cluster_vars.dns_server is defined and cluster_vars.dns_server is truthy %}https://{{cluster_name}}-apiserver.{{cluster_vars.dns_nameserver_zone}}{% endif %}"

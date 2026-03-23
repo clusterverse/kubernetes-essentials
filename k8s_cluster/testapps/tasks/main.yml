@@ -23,3 +23,21 @@
     apply: true
     server_side_apply: {field_manager: ansible-playbook}
     template: templates/tcpecho-deployment.yml.j2
+
+  # NOTE: to generate headlamp.yml.j2 (https://github.com/kubernetes-sigs/headlamp/tree/main/charts/headlamp)
+  # helm repo add headlamp https://kubernetes-sigs.github.io/headlamp/
+  # helm template headlamp --set httpRoute.enabled=true \
+  #  --set-json 'extraManifests=["apiVersion: gateway.networking.k8s.io/v1\nkind: Gateway\nmetadata:\n  name: headlamp-gw\n  namespace: default\nspec:\n  gatewayClassName: haproxy\n  listeners:\n  - name: http-listener\n    port: 80\n    protocol: HTTP"]' \
+  #  --set-json 'httpRoute.parentRefs=[{"name":"headlamp-gw"}]' \
+  #  --set-json 'httpRoute.hostnames=["headlamp.{{cluster_vars.dns_domain}}"]' \
+  #  --set-json 'httpRoute.rules'=[] \
+  #  --set config.sessionTTL=null \
+  #   headlamp/headlamp > headlamp.yml.j2
+  # NOTE: Get token using `kubectl create token headlamp`
+- name: test/headlamp | apply config
+  become: true
+  run_once: true
+  kubernetes.core.k8s:
+    apply: true
+    server_side_apply: {field_manager: ansible-playbook}
+    template: templates/headlamp.yml.j2

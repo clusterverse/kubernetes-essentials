@@ -17,6 +17,9 @@ It was originally loosely based on the [kelseyhightower/kubernetes-the-hard-way]
   + [flannel](https://github.com/coreos/flannel) provides the layer 3 overlay network
   + [CoreDNS](https://coredns.io/) provides internal DNS
   + Some testapps (applied using -e testapps=true) can be deployed with gateway-api enabled:
+    + **headlamp**: One of the replacements for the [dashboard](https://github.com/kubernetes/dashboard) project.
+      + `headlamp.{{cluster_vars.dns_domain}}`
+      + Get the token using `kubectl create token headlamp`
     + **nginx-test**: just a simple nginx webserver that echoes the host it is running on.
       + `curl nginx-test.{{cluster_vars.dns_domain}}`
     + **pyechoserver**:  A simple python web server that returns the ip address and host it is on (not really an echo server!).
