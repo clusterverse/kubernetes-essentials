@@ -6,11 +6,11 @@ global_defs {
   lvs_flush
   max_auto_priority
 
-  notify_priority_changes  false
   fifo_write_vrrp_states_on_reload
 
   # Using a fifo allows more efficient processing of notify events, and guarantees that they will be delivered in the correct sequence.
   vrrp_notify_fifo "/run/keepalived/vrrp_notify.fifo"
+  vrrp_notify_fifo_script "/etc/keepalived/keepalived-bypass-ipvs.sh"
 }
 
 vrrp_instance VI_1 {
@@ -34,6 +34,9 @@ vrrp_instance VI_1 {
   virtual_ipaddress {
     {{ apiserver.keepalived.vip_cidr }}
   }
+
+  # Not interested in priorty changes
+  notify_priority_changes  false
 
   # All servers are same priority, so no need to preempt
   nopreempt

@@ -4,7 +4,8 @@
 # Designed to allow a keepalived real-server to collocate with the director.
 # Automates NAT iptables changes when the VIP moves, via keepalived's notify_fifo.
 #
-# Run as a systemd service, started alongside keepalived.
+# Run by keepalived via vrrp_notify_fifo_script.
+# This script is started automatically by keepalived when the FIFO is created.
 #
 # global_defs {
 #   ...
@@ -22,6 +23,9 @@ LOG_TAG="keepalived-bypass-ipvs"
 # ----------------------------- Logging -----------------------------
 log()  { logger -t "$LOG_TAG" -- "$*"; }
 err()  { logger -t "$LOG_TAG" -p daemon.err -- "ERROR: $*"; }
+
+# --------------------- Trap Termination Interrupt -----------------
+trap 'log "Received termination signal"; exit 0' TERM INT
 
 # ----------------------------- Setup -----------------------------
 setup() {

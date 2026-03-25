@@ -26,22 +26,25 @@
     state: present
   notify: ["restart keepalived"]
 
-- name: apiserver-lb-ha-keepalived | copy keepalived-bypass-ipvs.service
-  become: true
-  template: src=keepalived-bypass-ipvs.service.j2 dest=/etc/systemd/system/keepalived-bypass-ipvs.service
-  notify: ["reload controller systemd", "restart keepalived-bypass-ipvs"]
-
-- name: apiserver-lb-ha-keepalived | copy keepalived-bypass-ipvs.sh
+- name: apiserver-lb-ha-keepalived | Install keepalived-bypass-ipvs.sh
   become: true
   template: src=keepalived-bypass-ipvs.sh.j2 dest=/etc/keepalived/keepalived-bypass-ipvs.sh owner=root group=root mode=0755
-  notify: ["restart keepalived-bypass-ipvs"]
+  notify: ["restart keepalived"]
 
-- name: apiserver-lb-ha-keepalived | Configure keepalived - create /run/keepalived
+- name: apiserver-lb-ha-keepalived | Create /run/keepalived directory, so keepalived can create the FIFO.  Created via tmpfiles.d -  can't use the 'ansible.builtin.file' module because /run is a tmpfs-backed path, which is wiped on reboot (so a reboot would mean no fifo for keepalived)
   become: true
-  file:
-    path: /run/keepalived
-    state: directory
-    mode: 0755
+  block:
+    - name: apiserver-lb-ha-keepalived | Create keepalived tmpfiles.d config
+      copy:
+        dest: /etc/tmpfiles.d/keepalived.conf
+        content: |
+          d /run/keepalived 0755 root root -
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: apiserver-lb-ha-keepalived | Apply tmpfiles.d immediately
+      command: systemd-tmpfiles --create /etc/tmpfiles.d/keepalived.conf
 
 - name: apiserver-lb-ha-keepalived | Configure keepalived - create /etc/keepalived/keepalived.conf
   become: true
@@ -50,7 +53,7 @@
     dest: /etc/keepalived/keepalived.conf
   vars:
     apiserver_keepalived_real_servers: "{{ groups['controller'] | map('extract', hostvars, ['ansible_facts', 'default_ipv4', 'address']) | sort }}"
-    apiserver_keepalived_peers: "{{ groups['controller'] | map('extract', hostvars, ['ansible_facts', 'default_ipv4', 'address']) | difference(ansible_host) | sort }}"
+    apiserver_keepalived_peers: "{{ groups['controller'] | map('extract', hostvars, ['ansible_facts', 'default_ipv4', 'address']) | difference([ansible_host]) | sort }}"
   notify: ["restart keepalived"]
 
 - name: apiserver-lb-ha-keepalived | Configure keepalived logging

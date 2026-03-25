@@ -35,8 +35,8 @@
       retries: 60     #5 minutes
       delay: 5
 
-    - name: addon | nodes status
-      debug: msg={{r__clusternodes_result}}
+#    - name: addon | nodes status
+#      debug: msg={{r__clusternodes_result}}
 
 - name: addon/haproxy-ingress | add Gateway API
   become: true
@@ -49,8 +49,8 @@
         src: "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/experimental-install.yaml"
       register: r__k8s__gateway_api_crd_install
 
-    - name: addon/haproxy-ingress | debug r__k8s__gateway_api_crd_install
-      debug: var=r__k8s__gateway_api_crd_install
+#    - name: addon/haproxy-ingress | debug r__k8s__gateway_api_crd_install
+#      debug: var=r__k8s__gateway_api_crd_install
 
     - name: addon/haproxy-ingress | wait for GatewayClass CRD
       kubernetes.core.k8s_info:
@@ -64,8 +64,8 @@
       retries: 10
       delay: 5
 
-    - name: addon/haproxy-ingress | debug r__k8s__gateway_api_crd_status
-      debug: var=r__k8s__gateway_api_crd_status
+#    - name: addon/haproxy-ingress | debug r__k8s__gateway_api_crd_status
+#      debug: var=r__k8s__gateway_api_crd_status
 
     - name: addon/haproxy-ingress | add GatewayClass
       kubernetes.core.k8s:
