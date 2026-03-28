@@ -1,16 +1,23 @@
 ---
 
-- name: controller | apt install
+- name: controller | pip install (debian)
   become: true
-  apt:
+  ansible.builtin.apt:
     name: ['python3-pip']
     update_cache: True
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: controller | pip install (rhel)
+  become: true
+  ansible.builtin.dnf:
+    name: ['python3-pip', 'python3-packaging']
+  when: ansible_facts['os_family'] == 'RedHat'
 
 - name: controller | Install PIP modules needed for Ansible k8s
   become: true
   ansible.builtin.pip:
     name: ["openshift", "kubernetes-validate"]
-    break_system_packages: true
+    break_system_packages: "{{ true if ansible_facts['os_family'] == 'Debian' else omit }}"
     extra_args: --ignore-installed
 
 - name: controller | Download & install kubectl

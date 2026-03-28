@@ -18,13 +18,20 @@
     state: present
     reload: true
 
-- name: apiserver-lb-ha-keepalived | Install keepalived package
+- name: apiserver-lb-ha-keepalived | Install keepalived package (debian)
   become: true
-  apt:
+  ansible.builtin.apt:
     update_cache: true
     name: ['keepalived']
     state: present
   notify: ["restart keepalived"]
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: apiserver-lb-ha-keepalived | Install keepalived package (redhat)
+  become: true
+  ansible.builtin.dnf:
+    name: ['keepalived']
+  when: ansible_facts['os_family'] == 'RedHat'
 
 - name: apiserver-lb-ha-keepalived | Install keepalived-bypass-ipvs.sh
   become: true
@@ -56,7 +63,7 @@
     apiserver_keepalived_peers: "{{ groups['controller'] | map('extract', hostvars, ['ansible_facts', 'default_ipv4', 'address']) | difference([ansible_host]) | sort }}"
   notify: ["restart keepalived"]
 
-- name: apiserver-lb-ha-keepalived | Configure keepalived logging
+- name: apiserver-lb-ha-keepalived | Configure keepalived logging (debian)
   become: true
   lineinfile:
     dest: "/etc/default/keepalived"
@@ -64,6 +71,17 @@
     line: 'DAEMON_ARGS="--log-detail \1'
     backrefs: true
   notify: ["restart keepalived"]
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: apiserver-lb-ha-keepalived | Configure keepalived logging (redhat)
+  become: true
+  lineinfile:
+    dest: "/etc/sysconfig/keepalived"
+    regexp: '^KEEPALIVED_OPTIONS="(.*")'
+    line: 'KEEPALIVED_OPTIONS="--log-detail \1'
+    backrefs: true
+  notify: ["restart keepalived"]
+  when: ansible_facts['os_family'] == 'RedHat'
 
 - name: apiserver-lb-ha-keepalived | flush handlers
   meta: flush_handlers

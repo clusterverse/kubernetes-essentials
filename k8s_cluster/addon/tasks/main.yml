@@ -32,8 +32,8 @@
         'json' in r__clusternodes_result  and
         (not r__clusternodes_result.json['items'] | json_query("[].metadata.name") | symmetric_difference(groups['node-worker'] + groups['node-edge']))  and 
         (r__clusternodes_result | json_query("json.items[].status.conditions[?type==`Ready` && status==`False`][] | length(@)") == 0)
-      retries: 60     #5 minutes
-      delay: 5
+      retries: 10     #2 minutes
+      delay: 12
 
 #    - name: addon | nodes status
 #      debug: msg={{r__clusternodes_result}}

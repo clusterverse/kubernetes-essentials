@@ -7,7 +7,7 @@ roles:
 
 collections:
   - name: clusterverse.clusterverse
-    version: ">=5.0.1,<5.1.0"
+    version: ">=5.0.2,<5.1.0"
     source: https://galaxy.ansible.com
 
   - name: dseeley.tasks_serial

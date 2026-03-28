@@ -13,7 +13,7 @@
 
 - name: apt install on localhost
   become: true
-  apt:
+  ansible.builtin.apt:
     name: ['build-essential', 'kubectl', 'ncat', 'google-cloud-sdk']
     update_cache: True
 

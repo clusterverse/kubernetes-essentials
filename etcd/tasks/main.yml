@@ -1,20 +1,26 @@
 ---
 
-- name: Add the etcd user
+- name: etcd | Add the etcd user
   become: true
   user: { name: "{{etcd.user}}", system: true }
 
-- name: generate etcd certs
+- name: etcd | generate etcd certs
   include_tasks: sslcerts-etcd.yml
 
-- name: Download etcd
+- name: etcd | dnf install unzip & tar (rhel)
+  become: true
+  ansible.builtin.dnf:
+    name: ['unzip', 'tar']
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: etcd | Download etcd
   become: true
   get_url:
     url: "{{ etcd.download_url }}"
     dest: "/tmp/{{ etcd.download_url | basename }}"
 
 - block:
-    - name: Unarchive etcd
+    - name: etcd | Unarchive etcd
       become: true
       unarchive:
         copy: false
@@ -22,7 +28,7 @@
         dest: "/tmp"
         creates: "/tmp/{{ _etcd_unarchive_dir }}/etcd"
 
-    - name: Copy binaries from archive into etcd dir
+    - name: etcd | Copy binaries from archive into etcd dir
       become: true
       copy:
         remote_src: True
@@ -36,7 +42,7 @@
   vars:
     _etcd_unarchive_dir: "{{ etcd.download_url | regex_replace('^.*\\/(.*?)\\.tar\\.gz$', '\\1') }}"
 
-- name: create etcd.data_dir
+- name: etcd | create etcd.data_dir
   become: true
   file:
     path: "{{ etcd.data_dir }}"
@@ -46,7 +52,7 @@
     mode: '0700'
   notify: ["restart etcd"]
 
-- name: Add etcd systemd service
+- name: etcd | Add etcd systemd service
   become: true
   copy:
     content: |

@@ -22,18 +22,31 @@
 
 - name: "common | Enable bridge netfilter manually when a bridging CNI is used (https://github.com/kubernetes/kubernetes/issues/24018)"
   block:
-    - name: common | load the br-netfilter module
+    - name: apiserver-lb-ha-keepalived | Install iptables (also installs br_netfilter (redhat)
+      become: true
+      ansible.builtin.dnf:
+        name: [ 'iptables' ]
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: common | load the br-netfilter module and make it persistent
       become: true
       modprobe:
-        name: br-netfilter
+        name: "{{ item }}"
         state: present
+        persistent: present
+      with_items:
+        - "overlay"
+        - "br_netfilter"
 
-    - name: common | (net.bridge.bridge-nf-call-iptables=1)
+    - name: common | set net.bridge.bridge-nf-call-ip[6]tables=1
       become: true
-      sysctl:
-        name: net.bridge.bridge-nf-call-iptables
+      ansible.posix.sysctl:
+        name: "{{ item }}"
         value: 1
         sysctl_set: true
         state: present
         reload: true
+      with_items:
+        - "net.bridge.bridge-nf-call-iptables"
+        - "net.bridge.bridge-nf-call-ip6tables"
   when: flannel_version is defined  and  flannel_version != ""

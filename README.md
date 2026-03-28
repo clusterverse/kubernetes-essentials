@@ -32,7 +32,7 @@ It supports (at present) AWS, libvirt(KVM/Qemu) and ESXi infrastructure.
 This project is designed to operate using [**clusterverse**](https://github.com/clusterverse/clusterverse) to manage the base infrastructure.  Please see the [README.md](https://github.com/clusterverse/clusterverse/blob/master/README.md) there for detailed instructions on its usage.
 
 ## Requirements / Compatibility
-+ Tested on Ubuntu 24,04 
++ Tested on Ubuntu 24,04 and AlmaLinux 10.1
 + ansible-core >= 2.17.4 (pypi >= 10.4.0)
 + See [docs/EXAMPLE/Dockerfile](https://github.com/clusterverse/clusterverse/blob/master/docs/EXAMPLE/Dockerfile) for a full list of dependencies.
 

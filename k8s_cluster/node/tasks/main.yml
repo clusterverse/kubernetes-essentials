@@ -14,23 +14,43 @@
         state: absent
       with_items: ["swap", "none"]
 
-    - name: node/hostconfig | apt install
+    - name: node/hostconfig | install unzip, for ansible.builtin.unarchive (debian)
       become: true
-      apt:
-        name: ['unzip']  	# 'unzip'  needed for ansible.builtin.unarchive
+      ansible.builtin.apt:
+        name: ['unzip']
         update_cache: True
+      when: ansible_facts['os_family'] == 'Debian'
+
+    - name: node/hostconfig | install unzip, for ansible.builtin.unarchive (redhat)
+      become: true
+      ansible.builtin.dnf:
+        name: ['unzip', 'tar']
+      when: ansible_facts['os_family'] == 'RedHat'
+
+    - name: node/hostconfig | install python3-cryptography (redhat)
+      become: true
+      ansible.builtin.dnf:
+        name: ['python3-cryptography']
+      when: ansible_facts['os_family'] == 'RedHat'
 
 
 - name: node | Run cloud-specific VIP config (if defined)
   include_tasks: "{{item}}"
   with_first_found: [{ files: ["vips_{{cluster_vars.cloud_type}}.yml"], skip: true }]
 
-- name: node | install node-dependent packages
+- name: node | install node-dependent packages (debian)
   become: true
-  apt:
+  ansible.builtin.apt:
     update_cache: true
     name: ['conntrack', 'ipset']
     state: present
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: node | install node-dependent packages (rhel)
+  become: true
+  ansible.builtin.dnf:
+    name: ['conntrack', 'ipset']
+  when: ansible_facts['os_family'] == 'RedHat'
 
 - name: node | load the nf_conntrack module
   become: true
