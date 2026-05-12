@@ -12,4 +12,4 @@ _rhel10image: "amazon/RHEL-10.0.0_HVM_GA-*-x86_64-0-Hourly2-GP3"                
 _alma10image: "aws-marketplace/AlmaLinux OS 10.*"                                   # Latest official AlmaLinux 10.x image
 
 cluster_vars:
-  image: "{{_ubuntu2404image}}"
+  image: "{{_ubuntu2604image}}"
