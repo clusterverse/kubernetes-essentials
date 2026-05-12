@@ -26,6 +26,7 @@
 
   # NOTE: to generate headlamp.yml.j2 (https://github.com/kubernetes-sigs/headlamp/tree/main/charts/headlamp)
   # helm repo add headlamp https://kubernetes-sigs.github.io/headlamp/
+  # helm repo update headlamp
   # helm template headlamp --set httpRoute.enabled=true \
   #  --set-json 'extraManifests=["apiVersion: gateway.networking.k8s.io/v1\nkind: Gateway\nmetadata:\n  name: headlamp-gw\n  namespace: default\nspec:\n  gatewayClassName: haproxy\n  listeners:\n  - name: http-listener\n    port: 80\n    protocol: HTTP"]' \
   #  --set-json 'httpRoute.parentRefs=[{"name":"headlamp-gw"}]' \

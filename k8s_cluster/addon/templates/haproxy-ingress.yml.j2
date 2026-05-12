@@ -4,10 +4,10 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress-default-backend
   namespace: kube-system
@@ -18,10 +18,10 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress
   namespace: kube-system
@@ -31,10 +31,10 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress
   namespace: kube-system
@@ -50,10 +50,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress
 rules:
@@ -151,10 +151,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress
 roleRef:
@@ -174,10 +174,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress
   namespace: kube-system
@@ -220,10 +220,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress
   namespace: kube-system
@@ -244,10 +244,10 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress-default-backend
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress-default-backend
   namespace: kube-system
@@ -267,10 +267,10 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress
   namespace: kube-system
@@ -292,10 +292,10 @@ spec:
         app.kubernetes.io/instance: haproxy-ingress
     spec:
       serviceAccountName: haproxy-ingress
-      automountServiceAccountToken: true
+      automountServiceAccountToken: false
       containers:
         - name: haproxy-ingress
-          image: "quay.io/jcmoraisjr/haproxy-ingress:v0.15.1"
+          image: "quay.io/jcmoraisjr/haproxy-ingress:v0.16.1"
           imagePullPolicy: "IfNotPresent"
           args:
             - --configmap=kube-system/haproxy-ingress
@@ -338,8 +338,41 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          volumeMounts:
+            - mountPath: /etc/haproxy
+              name: scratch
+              subPath: etc
+            - mountPath: /var/lib/haproxy
+              name: scratch
+              subPath: lib
+            - mountPath: /var/run/haproxy
+              name: scratch
+              subPath: run
+            - name: kube-api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
           resources:
             {}
+      volumes:
+        - name: scratch
+          emptyDir: {}
+        - name: kube-api-access
+          projected:
+            defaultMode: 0644
+            sources:
+            - serviceAccountToken:
+                expirationSeconds: 3600
+                path: token
+            - configMap:
+                name: kube-root-ca.crt
+                items:
+                - key: ca.crt
+                  path: ca.crt
+            - downwardAPI:
+                items:
+                - path: namespace
+                  fieldRef:
+                    fieldPath: metadata.namespace
       terminationGracePeriodSeconds: 60
       dnsPolicy: ClusterFirst
       hostNetwork: true
@@ -355,10 +388,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress-default-backend
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy-ingress-default-backend
   namespace: kube-system
@@ -419,10 +452,10 @@ apiVersion: networking.k8s.io/v1
 kind: IngressClass
 metadata:
   labels:
-    helm.sh/chart: haproxy-ingress-0.15.1
+    helm.sh/chart: haproxy-ingress-0.16.1
     app.kubernetes.io/name: haproxy-ingress
     app.kubernetes.io/instance: haproxy-ingress
-    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/version: "v0.16.1"
     app.kubernetes.io/managed-by: Helm
   name: haproxy
 spec:

@@ -2,6 +2,7 @@
 
   # Note: To generate flannel.yml (https://github.com/flannel-io/flannel/blob/master/README.md#deploying-flannel-with-helm):
   # helm repo add flannel https://flannel-io.github.io/flannel/
+  # helm repo update flannel
   # helm template flannel --namespace kube-system flannel/flannel > flannel.yml
 - name: addon/flannel | apply config
   become: true
@@ -78,12 +79,11 @@
             name: haproxy
           spec:
             controllerName: haproxy-ingress.github.io/controller
-        validate:
-          fail_on_error: yes
 
       # NOTE: to generate haproxy-ingress.yml:
       # https://github.com/haproxy-ingress/charts
       # helm repo add haproxy-ingress https://haproxy-ingress.github.io/charts
+      # helm repo update haproxy-ingress
       # helm template haproxy-ingress --namespace=kube-system --set controller.minAvailable=0 --set controller.maxUnavailable=-1 --set controller.replicaCount=0 --set controller.kind=DaemonSet --set controller.service.enabled=false --set controller.hostNetwork=true --set controller.ingressClass=haproxy --set controller.ingressClassResource.enabled=true --set-json controller.ingressClassResource.parameters='{"kind": "ConfigMap", "name": "haproxy-ingress"}' --set-json controller.config='{"balance-algorithm": "roundrobin", "maxconn-server": "500", "ssl-redirect": "false"}' --set-json 'controller.tolerations=[{"key":"node-role.kubernetes.io/{{edge_ingress.node_role_name}}","operator":"Equal","value":"true"}]' --set-json controller.nodeSelector='{"node-role.kubernetes.io/{{edge_ingress.node_role_name}}": "true"}' --set defaultBackend.enabled=true --set defaultBackend.minAvailable=0 --set defaultBackend.replicaCount=3  haproxy-ingress/haproxy-ingress > haproxy-ingress.yml.j2
     - name: addon/haproxy-ingress | apply haproxy-ingress config from template
       kubernetes.core.k8s:
@@ -97,6 +97,9 @@
   become: true
   run_once: true
   block:
+    # helm repo add coredns https://coredns.github.io/helm
+    # helm repo update coredns
+    # helm template coredns --namespace=kube-system coredns/coredns > coredns.yml.j2
     - name: addon/coredns | apply config
       kubernetes.core.k8s:
         apply: true

@@ -1,20 +1,20 @@
 ---
 
 #k8s_version: "{{ lookup('url', 'https://dl.k8s.io/release/stable.txt') | trim | regex_replace('^v', '') | default('1.35.3') }}"
-k8s_version: "1.35.3"
+k8s_version: "1.36.0"
 k8s_artifact_location: "https://dl.k8s.io/v{{k8s_version}}/bin/linux/{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}"
 
 ### containerd
 #containerd_version: "{{ lookup('url', 'https://api.github.com/repos/containerd/containerd/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('2.2.2') }}"
-containerd_version: "2.2.2"
+containerd_version: "2.3.0"
 containerd_artifact_location: "https://github.com/containerd/containerd/releases/download/v{{containerd_version}}/containerd-{{containerd_version}}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
 
 #nerdctl_version: "{{ lookup('url', 'https://api.github.com/repos/containerd/nerdctl/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('2.2.1') }}"
-nerdctl_version: "2.2.1"
+nerdctl_version: "2.2.2"
 nerdctl_artifact_location: "https://github.com/containerd/nerdctl/releases/download/v{{nerdctl_version}}/nerdctl-{{nerdctl_version}}-linux-{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}.tar.gz"
 
 #runc_version: "{{ lookup('url', 'https://api.github.com/repos/opencontainers/runc/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.4.1') }}"
-runc_version: "1.4.1"
+runc_version: "1.4.2"
 runc_artifact_location: "https://github.com/opencontainers/runc/releases/download/v{{runc_version}}/runc.{{'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture']}}"
 
 #cni_plugin_version: "{{ lookup('url', 'https://api.github.com/repos/containernetworking/plugins/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.9.1') }}"
@@ -29,16 +29,16 @@ k8s_network:
   dns_ip: 10.233.0.10                 # Cluster DNS server IP (coredns).  Must be from {{k8s_network.service_ip_cidr}} - traditionally x.x.x.10
   cluster_tld: "kubernetes"           # Cluster DNS TLD
 
-flannel_version: v0.28.1              # from ghcr.io/flannel-io/flannel
+flannel_version: v0.28.4              # from ghcr.io/flannel-io/flannel
 
 #descheduler_version: "{{ lookup('url', 'https://api.github.com/repos/kubernetes-sigs/descheduler/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('0.35.1') }}"
 descheduler_version: "0.35.1"
 
 #coredns_version: "{{ lookup('url', 'https://api.github.com/repos/coredns/coredns/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('1.14.2') }}"
-coredns_version: "1.14.2"
+coredns_version: "1.14.3"
 
 #coredns_version: "{{ lookup('url', 'https://api.github.com/repos/etcd-io/etcd/releases/latest', headers={'Accept': 'application/vnd.github+json'}) | from_json | json_query('tag_name') | regex_replace('^v', '') | default('3.6.9') }}"
-etcd_version: v3.6.9
+etcd_version: v3.6.11
 etcd:
   client_cert_file: &etcd_cert_file "{{k8s_cert_dir}}/etcd-crt.pem"
   client_key_file: &etcd_key_file "{{k8s_cert_dir}}/etcd-key.pem"

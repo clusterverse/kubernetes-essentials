@@ -1,23 +1,29 @@
 ---
 
-- name: Add Google's apt key
+- name: os_cfg_debian | apt install python3-debian on localhost
   become: true
-  apt_key:
-    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+  ansible.builtin.apt:
+    name: ['python3-debian']
+    update_cache: true
 
-- name: Adding google cloud sdk repository
+- name: os_cfg_debian | Add Repository and key (using new method, supported in > Ubuntu20.04, required by Ubuntu24.04.1)
   become: true
-  apt_repository:
-    repo: "deb [arch={{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture'] }}] https://packages.cloud.google.com/apt cloud-sdk main"
+  ansible.builtin.deb822_repository:
+    name: kubernetes
+    types: [deb]
+    architectures: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' if ansible_facts['architecture'] == 'aarch64' else ansible_facts['architecture'] }}"
+    uris: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version | regex_replace('^(\\d+\\.\\d+).*', '\\1') }}/deb/"
+    suites: "/"
+    signed_by: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version | regex_replace('^(\\d+\\.\\d+).*', '\\1') }}/deb/Release.key"
     state: present
 
-- name: apt install on localhost
+- name: os_cfg_debian | apt install kubectl on localhost
   become: true
   ansible.builtin.apt:
     name: ['build-essential', 'kubectl', 'ncat', 'google-cloud-sdk']
-    update_cache: True
+    update_cache: true
 
-- name: Install PIP packages
+- name: os_cfg_debian | Install PIP packages
   become: true
   ansible.builtin.pip:
     name: ["openshift", "kubernetes-validate"]
