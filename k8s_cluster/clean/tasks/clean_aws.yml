@@ -3,56 +3,103 @@
 - block:
     - name: apiserver-lb-awsnlb | Delete the N/ELB
       elb_network_lb:
-        aws_access_key: "{{ cluster_vars[buildenv].aws_access_key }}"
-        aws_secret_key: "{{ cluster_vars[buildenv].aws_secret_key }}"
-        region: "{{cluster_vars.region}}"
-        name: "{{cluster_name}}-apiserver"
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+        region: "{{ item }}"
+        name: "{{ cluster_name }}-apiserver"
         state: absent
+      loop: "{{ _aws_controller_regions }}"
+      loop_control: { label: "{{ item }}" }
 
     - name: apiserver-lb-awsnlb | Delete the elb_target_group
       elb_target_group:
-        aws_access_key: "{{ cluster_vars[buildenv].aws_access_key }}"
-        aws_secret_key: "{{ cluster_vars[buildenv].aws_secret_key }}"
-        region: "{{cluster_vars.region}}"
-        name: "{{cluster_name}}-apiserver"
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+        region: "{{ item }}"
+        name: "{{ cluster_name }}-apiserver"
         state: absent
+      loop: "{{ _aws_controller_regions }}"
+      loop_control: { label: "{{ item }}" }
 
     - block:
         - name: apiserver-lb-awsnlb | Gather info for pre-existing Hosted Zones (public and/or private)
-          route53_info:
-            aws_access_key: "{{cluster_vars[buildenv].aws_access_key}}"
-            aws_secret_key: "{{cluster_vars[buildenv].aws_secret_key}}"
+          amazon.aws.route53_info:
+            access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+            secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+            session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
             query: hosted_zone
           register: r__route53_info__zones
 
-        - name: apiserver-lb-awsnlb | Get CNAME records
-          route53:
-            aws_access_key: "{{cluster_vars[buildenv].aws_access_key}}"
-            aws_secret_key: "{{cluster_vars[buildenv].aws_secret_key}}"
+        - name: apiserver-lb-awsnlb | Get simple CNAME records
+          amazon.aws.route53:
+            access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+            secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+            session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
             state: "get"
-            zone: "{{cluster_vars.dns_nameserver_zone}}"
+            zone: "{{ cluster_vars.dns_nameserver_zone }}"
             record: "{{ apiserver.url | urlsplit('hostname') }}"
             type: "CNAME"
-            private_zone: "{{ item.Config.PrivateZone }}"
+            private_zone: "{{ item.config.private_zone }}"
           register: r__route53_cname
           ignore_errors: true
-          with_items: "{{ r__route53_info__zones.HostedZones | json_query(\"[?Name==`\" + cluster_vars.dns_nameserver_zone + \".`]\") }}"
+          loop: "{{ r__route53_info__zones.hosted_zones | json_query(\"[?name==`\" + cluster_vars.dns_nameserver_zone + \".`]\") }}"
+
+        - name: apiserver-lb-awsnlb | Get latency CNAME records
+          amazon.aws.route53:
+            access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+            secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+            session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+            state: "get"
+            zone: "{{ cluster_vars.dns_nameserver_zone }}"
+            record: "{{ apiserver.url | urlsplit('hostname') }}"
+            type: "CNAME"
+            identifier: "{{ item.1 }}"
+            region: "{{ item.1 }}"
+            private_zone: "{{ item.0.config.private_zone }}"
+          register: r__route53_cname_latency
+          ignore_errors: true
+          loop: "{{ (r__route53_info__zones.hosted_zones | json_query(\"[?name==`\" + cluster_vars.dns_nameserver_zone + \".`]\")) | product(_aws_controller_regions) | list }}"
 
         - name: apiserver-lb-awsnlb | debug r__route53_cname
-          debug: msg={{r__route53_cname}}
+          debug: msg={{ r__route53_cname }}
 
-        - name: apiserver-lb-awsnlb | Delete CNAME records
-          route53:
-            aws_access_key: "{{cluster_vars[buildenv].aws_access_key}}"
-            aws_secret_key: "{{cluster_vars[buildenv].aws_secret_key}}"
+        - name: apiserver-lb-awsnlb | debug r__route53_cname_latency
+          debug: msg={{ r__route53_cname_latency }}
+
+        - name: apiserver-lb-awsnlb | Delete simple CNAME records
+          amazon.aws.route53:
+            access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+            secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+            session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
             state: "absent"
             zone: "{{ item.set.zone }}"
             record: "{{ item.set.record }}"
             type: "{{ item.set.type }}"
             ttl: "{{ item.set.ttl }}"
             value: ["{{ item.set.value }}"]
-            private_zone: "{{ item.item.Config.PrivateZone }}"
-          with_items: "{{ r__route53_cname.results }}"
-          when: (item.failed == false)  and  (item.1.set.value is defined)  and  (item.set.keys()|length)
+            private_zone: "{{ item.item.config.private_zone }}"
+          loop: "{{ r__route53_cname.results }}"
+          when: not (item.failed | default(false)) and item.set is defined and item.set.value is defined
+
+        - name: apiserver-lb-awsnlb | Delete latency CNAME records
+          amazon.aws.route53:
+            access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+            secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+            session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+            state: "absent"
+            zone: "{{ item.set.zone }}"
+            record: "{{ item.set.record }}"
+            type: "{{ item.set.type }}"
+            ttl: "{{ item.set.ttl }}"
+            value: ["{{ item.set.value }}"]
+            identifier: "{{ item.item.1 }}"
+            region: "{{ item.item.1 }}"
+            private_zone: "{{ item.item.0.config.private_zone }}"
+          loop: "{{ r__route53_cname_latency.results | default([]) }}"
+          when: not (item.failed | default(false)) and item.set is defined and item.set.value is defined
       when: cluster_vars.dns_server == "route53"
   when: apiserver.lb_ha_mgr == "awsnlb"
+  vars:
+    _aws_controller_regions: "{{ cluster_vars[buildenv].hosttype_vars.controller.region_vars.keys() | list }}"

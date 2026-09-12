@@ -2,97 +2,129 @@
 
 - assert: { that: "apiserver.url is defined and apiserver.url is truthy", fail_msg: "Please define apiserver.url" }
 
-- name: apiserver-lb-awsnlb | ec2_instance_info
-  ec2_instance_info:
-    filters:
-      "tag:hosttype": "controller"
-      "instance-state-name": ["running"]
-    aws_access_key: "{{ cluster_vars[buildenv].aws_access_key }}"
-    aws_secret_key: "{{ cluster_vars[buildenv].aws_secret_key }}"
-    region: "{{cluster_vars.region}}"
-  delegate_to: localhost
-  run_once: true
-  register: r__ec2_instance_info
+- name: apiserver-lb-awsnlb | Create regional NLBs and DNS
+  vars:
+    _aws_controller_regions: "{{ cluster_vars[buildenv].hosttype_vars.controller.region_vars.keys() | list }}"
+  block:
+    - name: apiserver-lb-awsnlb | ec2_instance_info
+      ec2_instance_info:
+        filters:
+          "tag:cv__hosttype": "controller"
+          "tag:cv__cluster_name": "{{ cluster_name }}"
+          "instance-state-name": ["running"]
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+        region: "{{ item }}"
+      loop: "{{ _aws_controller_regions }}"
+      loop_control: { label: "{{ item }}" }
+      delegate_to: localhost
+      run_once: true
+      register: r__ec2_instance_info
 
-- name: apiserver-lb-awsnlb | r__ec2_instance_info
-  debug: msg="{{r__ec2_instance_info}}"
-  run_once: true
+    - name: apiserver-lb-awsnlb | r__ec2_instance_info
+      debug: msg="{{ r__ec2_instance_info }}"
+      run_once: true
 
-- name: apiserver-lb-awsnlb | create elb_target_group
-  elb_target_group:
-    aws_access_key: "{{ cluster_vars[buildenv].aws_access_key }}"
-    aws_secret_key: "{{ cluster_vars[buildenv].aws_secret_key }}"
-    region: "{{cluster_vars.region}}"
-    name: "{{cluster_name}}-apiserver"
-    protocol: TCP
-    port: "{{ apiserver.secure_port }}"
-    vpc_id: "{{ r__ec2_instance_info.instances | json_query(\"[].vpc_id | [0]\") }}"
-    health_check_protocol: TCP
-    health_check_interval: 10
-    targets: "{{ r__ec2_instance_info.instances | json_query(\"[].{Id: instance_id, Port: `\" + apiserver.secure_port|string + \"`}\") }}"
-    state: present
-  delegate_to: localhost
-  run_once: true
-  register: r__elb_target_group
+    - name: apiserver-lb-awsnlb | controller instances by region
+      set_fact:
+        _aws_controller_instances_by_region: "{{ r__ec2_instance_info.results | json_query('[?instances && length(instances)>`0`].{region: item, instances: instances, vpc_id: instances[0].vpc_id, subnet_ids: instances[].subnet_id}') }}"
+      run_once: true
 
-- name: apiserver-lb-awsnlb | r__elb_target_group
-  debug: msg="{{r__elb_target_group}}"
-  run_once: true
+    - name: apiserver-lb-awsnlb | create elb_target_group
+      elb_target_group:
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+        region: "{{ item.region }}"
+        name: "{{ cluster_name }}-apiserver"
+        protocol: TCP
+        port: "{{ apiserver.secure_port }}"
+        vpc_id: "{{ item.vpc_id }}"
+        health_check_protocol: TCP
+        health_check_interval: 10
+        targets: "{{ item.instances | json_query(\"[].{Id: instance_id, Port: `\" + apiserver.secure_port|string + \"`}\") }}"
+        state: present
+      loop: "{{ _aws_controller_instances_by_region }}"
+      loop_control: { label: "{{ item.region }}" }
+      delegate_to: localhost
+      run_once: true
+      register: r__elb_target_group
 
-- name: apiserver-lb-awsnlb | Create an N/ELB and attach a listener
-  elb_network_lb:
-    aws_access_key: "{{ cluster_vars[buildenv].aws_access_key }}"
-    aws_secret_key: "{{ cluster_vars[buildenv].aws_secret_key }}"
-    region: "{{cluster_vars.region}}"
-    name: "{{cluster_name}}-apiserver"
-    subnets: "{{ r__ec2_instance_info.instances | json_query(\"[].subnet_id\") }}"
-    scheme: internal
-    listeners:
-      - Protocol: TCP
-        Port: "{{ apiserver.secure_port }}"
-        DefaultActions: [{ Type: forward, TargetGroupName: "{{r__elb_target_group.target_group_name}}" }]
-    state: present
-    wait: true
-  delegate_to: localhost
-  run_once: true
-  register: r__elb_network_lb
+    - name: apiserver-lb-awsnlb | r__elb_target_group
+      debug: msg="{{ r__elb_target_group }}"
+      run_once: true
 
-- name: apiserver-lb-awsnlb | r__elb_network_lb
-  debug: msg="{{r__elb_network_lb}}"
-  run_once: true
+    - name: apiserver-lb-awsnlb | Create an N/ELB and attach a listener
+      elb_network_lb:
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+        region: "{{ item.region }}"
+        name: "{{ cluster_name }}-apiserver"
+        subnets: "{{ item.subnet_ids | unique }}"
+        scheme: internal
+        listeners:
+          - Protocol: TCP
+            Port: "{{ apiserver.secure_port }}"
+            DefaultActions: [{ Type: forward, TargetGroupName: "{{ _tg.target_group_name }}" }]
+        state: present
+        wait: true
+      vars:
+        _tg: "{{ r__elb_target_group.results | json_query(\"[?item.region=='\" + item.region + \"'] | [0]\") }}"
+      loop: "{{ _aws_controller_instances_by_region }}"
+      loop_control: { label: "{{ item.region }}" }
+      delegate_to: localhost
+      run_once: true
+      register: r__elb_network_lb
 
-- name: apiserver-lb-awsnlb | Gather info for pre-existing Hosted Zones (public and/or private)
-  route53_info:
-    aws_access_key: "{{cluster_vars[buildenv].aws_access_key}}"
-    aws_secret_key: "{{cluster_vars[buildenv].aws_secret_key}}"
-    query: hosted_zone
-  delegate_to: localhost
-  register: r__route53_info__zones
+    - name: apiserver-lb-awsnlb | r__elb_network_lb
+      debug: msg="{{ r__elb_network_lb }}"
+      run_once: true
 
-- name: apiserver-lb-awsnlb | r__route53_info__zones
-  debug: msg="{{r__route53_info__zones}}"
-  run_once: true
+    - name: apiserver-lb-awsnlb | Gather info for pre-existing Hosted Zones (public and/or private)
+      amazon.aws.route53_info:
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+        query: hosted_zone
+      delegate_to: localhost
+      run_once: true
+      register: r__route53_info__zones
+      when: cluster_vars.dns_server == "route53"
 
-- name: apiserver-lb-awsnlb | create CNAME(s)
-  route53:
-    aws_access_key: "{{cluster_vars[buildenv].aws_access_key}}"
-    aws_secret_key: "{{cluster_vars[buildenv].aws_secret_key}}"
-    state: present
-    zone: "{{cluster_vars.dns_nameserver_zone}}"
-    record: "{{ apiserver.url | urlsplit('hostname') }}"
-    type: CNAME
-    ttl: 30
-    value: "{{ r__elb_network_lb.dns_name }}"
-    private_zone: "{{ item.Config.PrivateZone }}"
-    overwrite: true
-  with_items: "{{ r__route53_info__zones.HostedZones | json_query(\"[?Name==`\" + cluster_vars.dns_nameserver_zone + \".`]\") }}"
-  become: false
-  delegate_to: localhost
-  run_once: true
-  when: cluster_vars.dns_server == "route53"
+    - name: apiserver-lb-awsnlb | r__route53_info__zones
+      debug: msg="{{ r__route53_info__zones }}"
+      run_once: true
+      when: cluster_vars.dns_server == "route53"
 
-- name: apiserver-lb-awsnlb | Wait for the NLB to be fully UP
-  wait_for:
-    port: "{{ apiserver.secure_port }}"
-    host: '{{ r__elb_network_lb.dns_name }}'
-  run_once: true
+    - name: apiserver-lb-awsnlb | create CNAME(s)
+      amazon.aws.route53:
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
+        state: present
+        zone: "{{ cluster_vars.dns_nameserver_zone }}"
+        record: "{{ apiserver.url | urlsplit('hostname') }}"
+        type: CNAME
+        ttl: 30
+        value: "{{ item.0.dns_name }}"
+        identifier: "{{ item.0.item.region if (r__elb_network_lb.results | length > 1) else omit }}"
+        region: "{{ item.0.item.region if (r__elb_network_lb.results | length > 1) else omit }}"
+        private_zone: "{{ item.1.config.private_zone }}"
+        overwrite: true
+      loop: "{{ r__elb_network_lb.results | product(r__route53_info__zones.hosted_zones | json_query(\"[?name==`\" + cluster_vars.dns_nameserver_zone + \".`]\")) | list }}"
+      loop_control: { label: "{{ item.0.item.region }} {{ item.1.Name }}" }
+      become: false
+      delegate_to: localhost
+      run_once: true
+      when: cluster_vars.dns_server == "route53"
+
+    - name: apiserver-lb-awsnlb | Wait for the NLB to be fully UP
+      wait_for:
+        port: "{{ apiserver.secure_port }}"
+        host: "{{ item.dns_name }}"
+      loop: "{{ r__elb_network_lb.results }}"
+      loop_control: { label: "{{ item.item.region }} {{ item.dns_name }}" }
+      delegate_to: "{{ (groups['controller'] | intersect(groups[item.item.region] | default([])) | list)[0] }}"
+      run_once: true

@@ -108,9 +108,9 @@
       include_tasks: apiserver-lb-awsnlb.yml
       when: apiserver.lb_ha_mgr == "awsnlb"
 
-    - name: controller | Install GCE load balancer for apiserver (GCP)
-      include_tasks: apiserver-lb-gcp.yml
-      when: apiserver.lb_ha_mgr == "gce_internal"
+#    - name: controller | Install GCE load balancer for apiserver (GCP)
+#      include_tasks: apiserver-lb-gcp.yml
+#      when: apiserver.lb_ha_mgr == "gce_internal"
 
     - name: controller | Wait for apiserver to be running loadbalanced
       uri:

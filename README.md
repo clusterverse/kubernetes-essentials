@@ -34,11 +34,12 @@ This project is designed to operate using [**clusterverse**](https://github.com/
 ## Requirements / Compatibility
 + Tested on Ubuntu 24,04 and AlmaLinux 10.1
 + ansible-core >= 2.17.4 (pypi >= 10.4.0)
-+ See [docs/EXAMPLE/Dockerfile](https://github.com/clusterverse/clusterverse/blob/master/docs/EXAMPLE/Dockerfile) for a full list of dependencies.
++ clusterverse.clusterverse >= 6.1.2
++ See [docs/EXAMPLE/Dockerfile_nonroot](https://github.com/clusterverse/clusterverse/blob/master/docs/EXAMPLE/Dockerfile_nonroot) for a full list of dependencies.
 
 
 ## Example
-Please see the [EXAMPLE](https://github.com/clusterverse/fluentd/tree/master/EXAMPLE) directory in this repository for some basic configuration.  This can be copied in the root directory, and used as a starting point for your own configuration.
+Please see the [EXAMPLE](https://github.com/clusterverse/kubernetes-essentials/tree/master/EXAMPLE) directory in this repository for some basic configuration.  This can be copied in the root directory, and used as a starting point for your own configuration.
 
 ### Configuration
 Clusters are defined as code within Ansible yaml files that are imported at runtime.  Because clusters are built from scratch on the localhost, the automatic Ansible `group_vars` inclusion cannot work with anything except the special `all.yml` group (actual `groups` need to be in the inventory, which cannot exist until the cluster is built).  The `group_vars/all.yml` file is instead used to bootstrap _merge_vars_, and the definitions are hierarchically defined in [cluster_defs](https://github.com/clusterverse/kubernetes-essentials/tree/master/EXAMPLE/cluster_defs).  Please see the full documentation in the main [clusterverse/README.md](https://github.com/clusterverse/clusterverse/blob/master/README.md#cluster-definition-variables)
@@ -48,22 +49,22 @@ Clusters are defined as code within Ansible yaml files that are imported at runt
 
 ### Invocation
 
-_**For full clusterverse invocation examples and command-line arguments, please see the [example README.md](https://github.com/clusterverse/clusterverse/blob/master/EXAMPLE/README.md)**_
+_**For full clusterverse invocation examples and command-line arguments, please see the [example README.md](https://github.com/clusterverse/clusterverse/blob/master/docs/EXAMPLE/README.md)**_
 
 The role is designed to run in two modes:
 #### Deploy (also performs _up-scaling_ and _repairs_)
-+ A playbook based on the [deploy.yml example](https://github.com/clusterverse/clusterverse/tree/master/EXAMPLE/deploy.yml) will be needed.
++ A playbook based on the [deploy.yml example](https://github.com/clusterverse/clusterverse/tree/master/docs/EXAMPLE/deploy.yml) will be needed.
 + The `deploy.yml` sub-role idempotently deploys a cluster from the config defined above (if it is run again (with no changes to variables), it will do nothing).  If the cluster variables are changed (e.g. add a host), the cluster will reflect the new variables (e.g. a new host will be added to the cluster.  Note: it _will not remove_ nodes, nor, usually, will it reflect changes to disk volumes - these are limitations of the underlying cloud modules).
 + Example:
 ```
-    ansible-playbook deploy.yml -e cloud_type=libvirt -e region=dougalab -e buildenv=dev -e testapps=true
+    ansible-playbook deploy.yml -e cloud_type=libvirt -e buildenv=dev -e testapps=true
 ```
 
 #### Redeploy
-+ A playbook based on the [redeploy.yml example](https://github.com/clusterverse/clusterverse/tree/master/EXAMPLE/redeploy.yml) will be needed.
++ A playbook based on the [redeploy.yml example](https://github.com/clusterverse/clusterverse/tree/master/docs/EXAMPLE/redeploy.yml) will be needed.
 + The `redeploy.yml` sub-role will completely redeploy the cluster; this is useful for example to upgrade the underlying operating system version.
 + Please see the full [documentation](#https://github.com/clusterverse/clusterverse#redeploy)
 + Example:
 ```
-    ansible-playbook redeploy.yml -e canary=none -e cloud_type=esxifree -e clusterid=dougakube -e region=dougalab -e buildenv=dev -e testapps=true
+    ansible-playbook redeploy.yml -e canary=none -e cloud_type=esxifree -e clusterid=dougakube -e buildenv=dev -e testapps=true
 ```

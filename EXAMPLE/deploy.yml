@@ -12,7 +12,7 @@
     - { include_role: { name: "clusterverse.clusterverse.create", apply: { tags: ["clusterverse_create"]} }, tags: ["clusterverse_create"] }
     - { include_role: { name: "clusterverse.clusterverse.dynamic_inventory", apply: { tags: ["always"]} }, tags: ["always"] }
 
-- name: clusterverse/deploy | Configure the cluster VM OSs (excluding not-being-redeployed hosts)
+- name: clusterverse/deploy | Configure the cluster VM OSs (excluding the not-being-redeployed hosts)
   hosts: all:!not_target_hosts
   gather_facts: false
   tasks: [ { include_role: { name: "clusterverse.clusterverse.config", apply: { tags: ["clusterverse_config"]} }, tags: ["clusterverse_config"] } ]

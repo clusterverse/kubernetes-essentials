@@ -7,8 +7,9 @@
 - block:
     - name: apiserver-lb-awsdns | create/update health-check
       route53_health_check:
-        aws_access_key: "{{cluster_vars[buildenv].aws_access_key}}"
-        aws_secret_key: "{{cluster_vars[buildenv].aws_secret_key}}"
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
         state: present
         ip_address: "{{ hostvars[item]['ansible_host'] }}"
         port: "{{ apiserver.secure_port }}"
@@ -27,8 +28,9 @@
 
     - name: apiserver-lb-awsdns | create/update A records
       route53:
-        aws_access_key: "{{cluster_vars[buildenv].aws_access_key}}"
-        aws_secret_key: "{{cluster_vars[buildenv].aws_secret_key}}"
+        access_key: "{{ cluster_vars[buildenv].aws_access_key | default(omit) }}"
+        secret_key: "{{ cluster_vars[buildenv].aws_secret_key | default(omit) }}"
+        session_token: "{{ cluster_vars[buildenv].aws_session_token | default(omit) }}"
         state: present
         zone: "{{cluster_vars.dns_nameserver_zone}}"
         record: "{{ apiserver.url | urlsplit('hostname') }}"
